@@ -385,12 +385,6 @@ UsedLibrary="/Users/yuuki.fj/Develop/EAGLE/libraries/mcp73831.lbr"
 UsedLibrary="/Users/yuuki.fj/Develop/EAGLE/libraries/microchip-dspic.lbr"
 UsedLibrary="/Users/yuuki.fj/Develop/EAGLE/libraries/microchip-pic12f1822.lbr"
 UsedLibrary="/Users/yuuki.fj/Develop/EAGLE/libraries/microusb2.lbr"
-UsedLibrary="/Users/yuuki.fj/Develop/EAGLE/libraries/rockoon.lbr"
-
-[Win_1]
-Type="Control Panel"
-Number=0
 
 [Desktop]
 Screen="2560 2490"
-Window="Win_1"
