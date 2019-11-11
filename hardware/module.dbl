@@ -4,6 +4,7 @@
 <designblock>
 <description></description>
 <attributes>
+<attribute name="AIRWIRES" value="YES"/>
 <attribute name="BOARDSIZE" value="57 x 40.9 mm"/>
 <attribute name="LAYERS" value="2: 1, 16"/>
 </attributes>
@@ -12883,170 +12884,173 @@ http://www.suntsuinc.com</description>
 <net name="N$15" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA0/USART4_TX/WKUP1/ADC_IN0"/>
-<wire x1="106.68" y1="15.24" x2="119.38" y2="15.24" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="15.24" x2="121.92" y2="15.24" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$16" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA1/ADC_IN1/COMP1_INP/USART4_RX"/>
 <wire x1="106.68" y1="12.7" x2="119.38" y2="12.7" width="0.1524" layer="91"/>
+<wire x1="119.38" y1="12.7" x2="119.38" y2="-81.28" width="0.1524" layer="91"/>
+<pinref part="LED" gate="G$1" pin="C"/>
+<wire x1="119.38" y1="-81.28" x2="101.6" y2="-81.28" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$17" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA2/ADC_IN2/WKUP4USART2_TX"/>
-<wire x1="106.68" y1="10.16" x2="119.38" y2="10.16" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="10.16" x2="121.92" y2="10.16" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$18" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA3/ADC_IN3/COMP2_INP/USART2_RX"/>
-<wire x1="106.68" y1="7.62" x2="119.38" y2="7.62" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="7.62" x2="121.92" y2="7.62" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$19" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA4/ADC_IN4/DAC_OUT1"/>
-<wire x1="106.68" y1="5.08" x2="119.38" y2="5.08" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="5.08" x2="121.92" y2="5.08" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$20" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA5/ADC_IN5/DAC_OUT2/SPI1_SCK"/>
-<wire x1="106.68" y1="2.54" x2="119.38" y2="2.54" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="2.54" x2="121.92" y2="2.54" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$21" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA6/ADC_IN6/SPI1_MISO/TIM3_CH1"/>
-<wire x1="106.68" y1="0" x2="119.38" y2="0" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="0" x2="121.92" y2="0" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$22" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA7/ADC_IN7/SPI1_MOSI/TIM3_CH2"/>
-<wire x1="106.68" y1="-2.54" x2="119.38" y2="-2.54" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-2.54" x2="121.92" y2="-2.54" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$23" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA8/TIM1_CH1"/>
-<wire x1="106.68" y1="-5.08" x2="119.38" y2="-5.08" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-5.08" x2="121.92" y2="-5.08" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="USART1_TX" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA9/USART1_TX/TIM1_CH2"/>
-<wire x1="106.68" y1="-7.62" x2="132.08" y2="-7.62" width="0.1524" layer="91"/>
-<label x="124.46" y="-7.62" size="1.778" layer="95"/>
+<wire x1="106.68" y1="-7.62" x2="134.62" y2="-7.62" width="0.1524" layer="91"/>
+<label x="127" y="-7.62" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="USART1_RX" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA10/USART1_RX/TIM1_CH3"/>
-<wire x1="106.68" y1="-10.16" x2="132.08" y2="-10.16" width="0.1524" layer="91"/>
-<label x="124.46" y="-10.16" size="1.778" layer="95"/>
+<wire x1="106.68" y1="-10.16" x2="134.62" y2="-10.16" width="0.1524" layer="91"/>
+<label x="127" y="-10.16" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="N$26" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA11/USB_DM/CAN_RX"/>
-<wire x1="106.68" y1="-12.7" x2="119.38" y2="-12.7" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-12.7" x2="121.92" y2="-12.7" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$27" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PA12/USB_DP/CAN_TX"/>
-<wire x1="106.68" y1="-15.24" x2="119.38" y2="-15.24" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-15.24" x2="121.92" y2="-15.24" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$29" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB0/ADC_IN8/TIM3_CH3"/>
-<wire x1="106.68" y1="-30.48" x2="119.38" y2="-30.48" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-30.48" x2="121.92" y2="-30.48" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$30" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB1/ADC_IN9/TIM3_CH4"/>
-<wire x1="106.68" y1="-33.02" x2="119.38" y2="-33.02" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-33.02" x2="121.92" y2="-33.02" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$31" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB2"/>
-<wire x1="106.68" y1="-35.56" x2="119.38" y2="-35.56" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-35.56" x2="121.92" y2="-35.56" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="SPI1_SCK" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB3/SPI1_SCK/TIM2_CH2"/>
-<wire x1="106.68" y1="-38.1" x2="132.08" y2="-38.1" width="0.1524" layer="91"/>
-<label x="124.46" y="-38.1" size="1.778" layer="95"/>
+<wire x1="106.68" y1="-38.1" x2="134.62" y2="-38.1" width="0.1524" layer="91"/>
+<label x="127" y="-38.1" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="SPI1_MISO" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB4/SPI1_MISO/TIM3_CH1"/>
-<wire x1="106.68" y1="-40.64" x2="132.08" y2="-40.64" width="0.1524" layer="91"/>
-<label x="124.46" y="-40.64" size="1.778" layer="95"/>
+<wire x1="106.68" y1="-40.64" x2="134.62" y2="-40.64" width="0.1524" layer="91"/>
+<label x="127" y="-40.64" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="SPI1_MOSI" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB5/WKUP6/SPI1_MOSI/TIM3_CH2"/>
-<wire x1="106.68" y1="-43.18" x2="132.08" y2="-43.18" width="0.1524" layer="91"/>
-<label x="124.46" y="-43.18" size="1.778" layer="95"/>
+<wire x1="106.68" y1="-43.18" x2="134.62" y2="-43.18" width="0.1524" layer="91"/>
+<label x="127" y="-43.18" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="I2C1_SCL" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB6USART1_TX/I2C1_SCL"/>
-<wire x1="106.68" y1="-45.72" x2="132.08" y2="-45.72" width="0.1524" layer="91"/>
-<label x="124.46" y="-45.72" size="1.778" layer="95"/>
+<wire x1="106.68" y1="-45.72" x2="134.62" y2="-45.72" width="0.1524" layer="91"/>
+<label x="127" y="-45.72" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="I2C1_SCK" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB7/USART1_RX/I2C1_SDA"/>
-<wire x1="106.68" y1="-48.26" x2="132.08" y2="-48.26" width="0.1524" layer="91"/>
-<label x="124.46" y="-48.26" size="1.778" layer="95"/>
+<wire x1="106.68" y1="-48.26" x2="134.62" y2="-48.26" width="0.1524" layer="91"/>
+<label x="127" y="-48.26" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="N$37" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB10/I2C2_SCL/TIM2_CH3/USART3_TX"/>
-<wire x1="106.68" y1="-55.88" x2="119.38" y2="-55.88" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-55.88" x2="121.92" y2="-55.88" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$38" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB11/I2C2_SDA/TIM2_C4/USART3_RX"/>
-<wire x1="106.68" y1="-58.42" x2="119.38" y2="-58.42" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-58.42" x2="121.92" y2="-58.42" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$39" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB12"/>
-<wire x1="106.68" y1="-60.96" x2="119.38" y2="-60.96" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-60.96" x2="121.92" y2="-60.96" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$40" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB13/SPI2_SCK/I2C2_SCL"/>
-<wire x1="106.68" y1="-63.5" x2="119.38" y2="-63.5" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-63.5" x2="121.92" y2="-63.5" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$41" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB14/SPI2_MISO/I2C2_SDA"/>
-<wire x1="106.68" y1="-66.04" x2="119.38" y2="-66.04" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-66.04" x2="121.92" y2="-66.04" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$42" class="0">
 <segment>
 <pinref part="STM32F072" gate="G$1" pin="PB15/WKUP7/RTC_REFIN/SPI2_MOSI"/>
-<wire x1="106.68" y1="-68.58" x2="119.38" y2="-68.58" width="0.1524" layer="91"/>
+<wire x1="106.68" y1="-68.58" x2="121.92" y2="-68.58" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$13" class="0">
@@ -13067,15 +13071,6 @@ http://www.suntsuinc.com</description>
 <wire x1="10.16" y1="-63.5" x2="5.08" y2="-63.5" width="0.1524" layer="91"/>
 <pinref part="CL1" gate="G$1" pin="2"/>
 <junction x="5.08" y="-63.5"/>
-</segment>
-</net>
-<net name="N$24" class="0">
-<segment>
-<pinref part="STM32F072" gate="G$1" pin="PA15/USART2_RX"/>
-<wire x1="106.68" y1="-22.86" x2="111.76" y2="-22.86" width="0.1524" layer="91"/>
-<wire x1="111.76" y1="-22.86" x2="111.76" y2="-81.28" width="0.1524" layer="91"/>
-<pinref part="LED" gate="G$1" pin="C"/>
-<wire x1="111.76" y1="-81.28" x2="101.6" y2="-81.28" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$25" class="0">
@@ -14838,10 +14833,10 @@ design rules under a new name.</description>
 <attribute name="SPICEPREFIX" value="C" x="24.384" y="-12.065" size="1.778" layer="27" rot="R180" display="off"/>
 <attribute name="VALUE" x="25.184" y="-10.415" size="1.016" layer="27" rot="R180"/>
 </element>
-<element name="LED" library="led" library_urn="urn:adsk.eagle:library:259" package="CHIP-LED0603" package3d_urn="urn:adsk.eagle:package:15819/3" value="" x="13.97" y="19.05" smashed="yes" rot="R270">
-<attribute name="NAME" x="15.621" y="18.669" size="0.8128" layer="25" font="vector"/>
-<attribute name="POPULARITY" value="26" x="13.97" y="19.05" size="1.778" layer="27" rot="R270" display="off"/>
-<attribute name="VALUE" x="13.335" y="17.145" size="1.27" layer="27"/>
+<element name="LED" library="led" library_urn="urn:adsk.eagle:library:259" package="CHIP-LED0603" package3d_urn="urn:adsk.eagle:package:15819/3" value="" x="27.94" y="-19.05" smashed="yes" rot="R90">
+<attribute name="NAME" x="26.289" y="-18.669" size="0.8128" layer="25" font="vector" rot="R180"/>
+<attribute name="POPULARITY" value="26" x="27.94" y="-19.05" size="1.778" layer="27" rot="R90" display="off"/>
+<attribute name="VALUE" x="28.575" y="-17.145" size="1.27" layer="27" rot="R180"/>
 </element>
 <element name="FC-255" library="crystal'" package="FC-255" value="32.768kHz" x="22.479" y="-15.494" smashed="yes" rot="R180">
 <attribute name="NAME" x="25.3365" y="-12.954" size="0.8128" layer="25" font="vector" rot="R180"/>
@@ -14856,11 +14851,11 @@ design rules under a new name.</description>
 <attribute name="POPULARITY" value="30" x="24.13" y="-18.288" size="1.778" layer="27" display="off"/>
 <attribute name="SPICEPREFIX" value="C" x="24.13" y="-18.288" size="1.778" layer="27" display="off"/>
 </element>
-<element name="R1" library="rcl" library_urn="urn:adsk.eagle:library:334" package="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="" x="13.97" y="17.526" smashed="yes" rot="R180">
-<attribute name="NAME" x="15.621" y="17.145" size="0.8128" layer="25" font="vector"/>
-<attribute name="POPULARITY" value="77" x="13.97" y="17.526" size="1.778" layer="27" rot="R180" display="off"/>
-<attribute name="SPICEPREFIX" value="R" x="13.97" y="17.526" size="1.778" layer="27" rot="R180" display="off"/>
-<attribute name="VALUE" x="14.605" y="19.431" size="1.27" layer="27" rot="R180"/>
+<element name="R1" library="rcl" library_urn="urn:adsk.eagle:library:334" package="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="" x="27.94" y="-16.764" smashed="yes">
+<attribute name="NAME" x="26.289" y="-16.383" size="0.8128" layer="25" font="vector" rot="R180"/>
+<attribute name="POPULARITY" value="77" x="27.94" y="-16.764" size="1.778" layer="27" display="off"/>
+<attribute name="SPICEPREFIX" value="R" x="27.94" y="-16.764" size="1.778" layer="27" display="off"/>
+<attribute name="VALUE" x="27.305" y="-18.669" size="1.27" layer="27"/>
 </element>
 </elements>
 <signals>
@@ -14968,15 +14963,9 @@ design rules under a new name.</description>
 <wire x1="20.701" y1="1.778" x2="20.701" y2="0.762" width="1.016" layer="16"/>
 <wire x1="20.701" y1="1.778" x2="21.59" y2="0.889" width="1.016" layer="16"/>
 <wire x1="21.59" y1="0.889" x2="21.59" y2="0.762" width="1.016" layer="16"/>
-<wire x1="13.462" y1="12.7" x2="13.462" y2="14.732" width="1.016" layer="16"/>
-<wire x1="13.462" y1="14.732" x2="13.97" y2="15.24" width="1.016" layer="16"/>
-<via x="14.605" y="15.875" extent="1-16" drill="0.5"/>
-<wire x1="13.97" y1="15.24" x2="14.605" y2="15.875" width="1.016" layer="16"/>
-<via x="13.97" y="15.24" extent="1-16" drill="0.5"/>
-<wire x1="13.97" y1="15.24" x2="14.605" y2="15.875" width="1.016" layer="1"/>
-<wire x1="14.82" y1="17.526" x2="14.859" y2="17.487" width="0.254" layer="1"/>
-<wire x1="14.859" y1="17.487" x2="14.859" y2="16.129" width="0.254" layer="1"/>
-<wire x1="14.605" y1="15.875" x2="14.859" y2="16.129" width="0.254" layer="1"/>
+<wire x1="27.09" y1="-16.764" x2="27.09" y2="-13.911" width="0.4064" layer="1"/>
+<wire x1="27.09" y1="-13.911" x2="25.259" y2="-12.08" width="0.4064" layer="1"/>
+<wire x1="25.259" y1="-12.08" x2="25.259" y2="-12.065" width="0.4064" layer="1"/>
 </signal>
 <signal name="GND">
 <contactref element="U$1" pad="5"/>
@@ -15121,7 +15110,6 @@ design rules under a new name.</description>
 <via x="23.114" y="-7.874" extent="1-16" drill="0.5"/>
 <via x="23.876" y="-5.588" extent="1-16" drill="0.5"/>
 <wire x1="22.479" y1="-19.558" x2="23.255" y2="-19.558" width="0.508" layer="1"/>
-<wire x1="23.241" y1="-19.558" x2="26.416" y2="-19.558" width="0.508" layer="1"/>
 <wire x1="22.098" y1="-1.651" x2="21.59" y2="-1.143" width="1.016" layer="16"/>
 <polygon width="0" layer="16">
 <vertex x="23.241" y="-2.921"/>
@@ -15338,6 +15326,17 @@ design rules under a new name.</description>
 <vertex x="14.097" y="-5.08"/>
 <vertex x="13.462" y="-5.08"/>
 </polygon>
+<wire x1="23.876" y1="-5.588" x2="25.527" y2="-6.223" width="0" layer="19" extent="1-1"/>
+<wire x1="23.876" y1="-12.065" x2="23.509" y2="-12.065" width="0" layer="19" extent="1-1"/>
+<wire x1="12.7" y1="-17.907" x2="12.841" y2="-18.415" width="0" layer="19" extent="1-1"/>
+<wire x1="23.241" y1="-19.558" x2="22.479" y2="-19.558" width="0" layer="19" extent="1-1"/>
+<wire x1="12.827" y1="-19.431" x2="12.841" y2="-18.415" width="0" layer="19" extent="1-1"/>
+<wire x1="20.32" y1="-13.208" x2="18.796" y2="-13.716" width="0" layer="19" extent="1-1"/>
+<wire x1="20.32" y1="-11.938" x2="20.32" y2="-13.208" width="0" layer="19" extent="1-1"/>
+<wire x1="10.922" y1="-19.431" x2="11.684" y2="-18.034" width="0" layer="19" extent="1-1"/>
+<wire x1="20.193" y1="-4.699" x2="22.098" y2="-5.588" width="0" layer="19" extent="1-1"/>
+<wire x1="20.955" y1="-3.302" x2="20.193" y2="-4.699" width="0" layer="19" extent="1-1"/>
+<wire x1="15.621" y1="-19.431" x2="12.827" y2="-19.431" width="0" layer="19" extent="1-1"/>
 </signal>
 <signal name="VPP">
 <contactref element="U$1" pad="1"/>
@@ -15555,6 +15554,14 @@ design rules under a new name.</description>
 </signal>
 <signal name="N$16">
 <contactref element="STM32F072" pad="11"/>
+<contactref element="LED" pad="C"/>
+<wire x1="27.933409375" y1="-17.798590625" x2="27.19" y2="-18.542" width="0.254" layer="1"/>
+<wire x1="27.19" y1="-18.542" x2="27.19" y2="-19.05" width="0.254" layer="1"/>
+<wire x1="27.933409375" y1="-11.550409375" x2="27.305" y2="-10.922" width="0.254" layer="1"/>
+<wire x1="27.305" y1="-10.922" x2="25.527" y2="-10.922" width="0.254" layer="1"/>
+<wire x1="25.527" y1="-10.922" x2="25.11" y2="-10.505" width="0.254" layer="1"/>
+<wire x1="27.933409375" y1="-17.798590625" x2="27.933409375" y2="-11.550409375" width="0.254" layer="1"/>
+<wire x1="25.11" y1="-10.505" x2="25.11" y2="-9.23" width="0.254" layer="1"/>
 </signal>
 <signal name="N$17">
 <contactref element="STM32F072" pad="12"/>
@@ -15705,25 +15712,6 @@ design rules under a new name.</description>
 <wire x1="19.953" y1="-18.288" x2="19.953" y2="-15.92" width="0.254" layer="1"/>
 <wire x1="19.953" y1="-15.92" x2="20.379" y2="-15.494" width="0.254" layer="1"/>
 </signal>
-<signal name="N$24">
-<contactref element="STM32F072" pad="38"/>
-<wire x1="18.71" y1="-2.83" x2="17.816" y2="-2.83" width="0.254" layer="1"/>
-<wire x1="17.816" y1="-2.83" x2="17.653" y2="-2.667" width="0.254" layer="1"/>
-<wire x1="17.653" y1="-2.667" x2="17.653" y2="10.795" width="0.254" layer="1"/>
-<wire x1="17.653" y1="10.795" x2="18.034" y2="11.176" width="0.254" layer="1"/>
-<wire x1="18.034" y1="11.176" x2="20.701" y2="11.176" width="0.254" layer="1"/>
-<contactref element="LED" pad="C"/>
-<via x="20.701" y="11.176" extent="1-16" drill="0.35"/>
-<wire x1="20.701" y1="11.176" x2="19.685" y2="12.192" width="0.254" layer="16"/>
-<wire x1="19.685" y1="12.192" x2="15.24" y2="12.192" width="0.254" layer="16"/>
-<wire x1="15.24" y1="12.192" x2="14.859" y2="12.573" width="0.254" layer="16"/>
-<wire x1="14.859" y1="12.573" x2="14.859" y2="14.224" width="0.254" layer="16"/>
-<via x="14.859" y="14.224" extent="1-16" drill="0.35"/>
-<wire x1="15.748" y1="15.113" x2="15.748" y2="18.669" width="0.254" layer="1"/>
-<wire x1="15.748" y1="18.669" x2="15.367" y2="19.05" width="0.254" layer="1"/>
-<wire x1="15.367" y1="19.05" x2="14.72" y2="19.05" width="0.254" layer="1"/>
-<wire x1="14.859" y1="14.224" x2="15.748" y2="15.113" width="0.254" layer="1"/>
-</signal>
 <signal name="N$25">
 <contactref element="U$1" pad="16"/>
 <wire x1="5" y1="17.78" x2="10.16" y2="17.78" width="0.254" layer="16"/>
@@ -15743,8 +15731,8 @@ design rules under a new name.</description>
 <signal name="N$32">
 <contactref element="R1" pad="2"/>
 <contactref element="LED" pad="A"/>
-<wire x1="13.22" y1="19.05" x2="13.12" y2="18.95" width="0.508" layer="1"/>
-<wire x1="13.12" y1="17.526" x2="13.12" y2="18.95" width="0.254" layer="1"/>
+<wire x1="28.79" y1="-16.764" x2="28.79" y2="-18.95" width="0.4064" layer="1"/>
+<wire x1="28.79" y1="-18.95" x2="28.69" y2="-19.05" width="0.4064" layer="1"/>
 </signal>
 </signals>
 <mfgpreviewcolors>
