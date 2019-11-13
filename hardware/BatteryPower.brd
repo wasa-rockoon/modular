@@ -37,7 +37,7 @@
 <layer number="27" name="tValues" color="7" fill="1" visible="no" active="yes"/>
 <layer number="28" name="bValues" color="7" fill="1" visible="no" active="yes"/>
 <layer number="29" name="tStop" color="7" fill="3" visible="no" active="yes"/>
-<layer number="30" name="bStop" color="7" fill="6" visible="yes" active="yes"/>
+<layer number="30" name="bStop" color="7" fill="6" visible="no" active="yes"/>
 <layer number="31" name="tCream" color="7" fill="4" visible="no" active="yes"/>
 <layer number="32" name="bCream" color="7" fill="5" visible="no" active="yes"/>
 <layer number="33" name="tFinish" color="6" fill="3" visible="no" active="yes"/>
@@ -4318,14 +4318,13 @@ design rules under a new name.</description>
 <signal name="CANH1">
 <contactref element="U$2" pad="7"/>
 <contactref element="MCP2562" pad="7"/>
-<wire x1="11.811" y1="1.397" x2="11.811" y2="-5.351" width="0.508" layer="1"/>
+<wire x1="11.811" y1="1.016" x2="11.811" y2="-5.351" width="0.508" layer="1"/>
 <wire x1="13.843" y1="-7.383" x2="13.843" y2="-9.923" width="0.508" layer="1"/>
 <wire x1="13.843" y1="-9.923" x2="13.335" y2="-10.431" width="0.508" layer="1"/>
 <wire x1="13.335" y1="-11.32" x2="13.335" y2="-10.431" width="0.508" layer="1"/>
 <wire x1="13.843" y1="-7.383" x2="11.811" y2="-5.351" width="0.508" layer="1"/>
-<wire x1="11.811" y1="1.397" x2="10.16" y2="3.048" width="0.508" layer="1"/>
-<wire x1="10.16" y1="3.048" x2="5.508" y2="3.048" width="0.508" layer="1"/>
-<wire x1="5.508" y1="3.048" x2="5" y2="2.54" width="0.508" layer="1"/>
+<wire x1="11.811" y1="1.016" x2="10.287" y2="2.54" width="0.508" layer="1"/>
+<wire x1="10.287" y1="2.54" x2="5" y2="2.54" width="0.508" layer="1"/>
 </signal>
 <signal name="VBAT">
 <contactref element="U$2" pad="4"/>
@@ -4379,10 +4378,10 @@ design rules under a new name.</description>
 <contactref element="MCP2562" pad="6"/>
 <wire x1="14.605" y1="-11.32" x2="14.605" y2="-7.129" width="0.508" layer="1"/>
 <wire x1="14.605" y1="-7.129" x2="12.573" y2="-5.097" width="0.508" layer="1"/>
-<wire x1="12.573" y1="2.032" x2="12.573" y2="-5.097" width="0.508" layer="1"/>
-<wire x1="12.573" y1="2.032" x2="10.033" y2="4.572" width="0.508" layer="1"/>
-<wire x1="10.033" y1="4.572" x2="5.508" y2="4.572" width="0.508" layer="1"/>
-<wire x1="5.508" y1="4.572" x2="5" y2="5.08" width="0.508" layer="1"/>
+<wire x1="12.573" y1="2.667" x2="12.573" y2="-5.097" width="0.508" layer="1"/>
+<wire x1="12.573" y1="2.667" x2="10.287" y2="4.953" width="0.508" layer="1"/>
+<wire x1="10.287" y1="4.953" x2="5.127" y2="4.953" width="0.508" layer="1"/>
+<wire x1="5.127" y1="4.953" x2="5" y2="5.08" width="0.508" layer="1"/>
 </signal>
 <signal name="CAN_RX">
 <contactref element="STM32F001" pad="45"/>

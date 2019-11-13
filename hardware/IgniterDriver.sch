@@ -19795,6 +19795,7 @@ Source: http://www.murata.com .. GRM43DR72E224KW01.pdf</description>
 <part name="R19" library="resistor" library_urn="urn:adsk.eagle:library:348" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:26057/1" value="1k"/>
 <part name="R20" library="resistor" library_urn="urn:adsk.eagle:library:348" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:26057/1" value="1k"/>
 <part name="R21" library="resistor" library_urn="urn:adsk.eagle:library:348" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:26057/1" value="1k"/>
+<part name="GND20" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 </parts>
 <sheets>
 <sheet>
@@ -20079,10 +20080,6 @@ Source: http://www.murata.com .. GRM43DR72E224KW01.pdf</description>
 <attribute name="NAME" x="193.04" y="165.735" size="1.778" layer="95"/>
 <attribute name="VALUE" x="193.04" y="152.4" size="1.778" layer="96"/>
 </instance>
-<instance part="IC1" gate="D" x="269.24" y="157.48" smashed="yes">
-<attribute name="NAME" x="261.62" y="163.195" size="1.778" layer="95"/>
-<attribute name="VALUE" x="261.62" y="149.86" size="1.778" layer="96"/>
-</instance>
 <instance part="C4" gate="G$1" x="243.84" y="58.42" smashed="yes">
 <attribute name="NAME" x="245.364" y="58.801" size="1.778" layer="95"/>
 <attribute name="VALUE" x="245.364" y="53.721" size="1.778" layer="96"/>
@@ -20120,6 +20117,9 @@ Source: http://www.murata.com .. GRM43DR72E224KW01.pdf</description>
 <instance part="R21" gate="G$1" x="91.44" y="187.96" smashed="yes" rot="R90">
 <attribute name="NAME" x="92.4814" y="179.07" size="1.778" layer="95" rot="R90"/>
 <attribute name="VALUE" x="92.202" y="191.77" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="GND20" gate="1" x="266.7" y="63.5" smashed="yes">
+<attribute name="VALUE" x="264.16" y="60.96" size="1.778" layer="96"/>
 </instance>
 </instances>
 <busses>
@@ -20264,6 +20264,11 @@ Source: http://www.murata.com .. GRM43DR72E224KW01.pdf</description>
 <segment>
 <pinref part="R16" gate="G$1" pin="1"/>
 <pinref part="GND15" gate="1" pin="GND"/>
+</segment>
+<segment>
+<wire x1="264.16" y1="66.04" x2="266.7" y2="66.04" width="0.1524" layer="91"/>
+<pinref part="GND20" gate="1" pin="GND"/>
+<label x="264.16" y="66.04" size="1.778" layer="95" xref="yes"/>
 </segment>
 </net>
 <net name="VDD" class="0">
@@ -20819,7 +20824,6 @@ Source: http://www.murata.com .. GRM43DR72E224KW01.pdf</description>
 <wire x1="175.26" y1="162.56" x2="187.96" y2="162.56" width="0.1524" layer="91"/>
 <junction x="175.26" y="162.56"/>
 <pinref part="IC1" gate="C" pin="A"/>
-<wire x1="187.96" y1="162.56" x2="185.42" y2="162.56" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="VBAT+" class="0">
