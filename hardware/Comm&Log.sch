@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE eagle SYSTEM "eagle.dtd">
-<eagle version="9.5.1">
+<eagle version="9.5.2">
 <drawing>
 <settings>
 <setting alwaysvectorfont="no"/>
@@ -17347,14 +17347,14 @@ Source: http://www.murata.com .. GRM43DR72E224KW01.pdf</description>
 <part name="C11" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603K" package3d_urn="urn:adsk.eagle:package:23680/2"/>
 <part name="VDD11" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="VDD" device=""/>
 <part name="VDD12" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="VDD" device=""/>
-<part name="C12" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603K" package3d_urn="urn:adsk.eagle:package:23680/2"/>
+<part name="C12" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603K" package3d_urn="urn:adsk.eagle:package:23680/2" value="0.1µF"/>
 <part name="VDD13" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="VDD" device=""/>
 <part name="LED1" library="led" library_urn="urn:adsk.eagle:library:259" deviceset="LED" device="CHIP-LED0603" package3d_urn="urn:adsk.eagle:package:15819/3"/>
 <part name="CRYSTAL" library="crystal'" deviceset="CRYTAL" device="FC-255" value="32.768kHz"/>
 <part name="CL3" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603K" package3d_urn="urn:adsk.eagle:package:23680/2" value="15pF"/>
 <part name="CL4" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603K" package3d_urn="urn:adsk.eagle:package:23680/2" value="15pF"/>
 <part name="GND9" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
-<part name="R2" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3"/>
+<part name="R2" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="470"/>
 <part name="VDD14" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="VDD" device=""/>
 <part name="GND10" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 <part name="TWE-LITE" library="TWELite" deviceset="LITE" device=""/>

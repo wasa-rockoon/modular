@@ -24792,7 +24792,7 @@ Source: http://www.murata.com .. GRM43DR72E224KW01.pdf</description>
 <part name="SUPPLY1" library="supply2" library_urn="urn:adsk.eagle:library:372" deviceset="VPP" device=""/>
 <part name="C16" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="CPOL-EU" device="UD-5X5,8" package3d_urn="urn:adsk.eagle:package:23470/1" value="47µF"/>
 <part name="C17" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="CPOL-EU" device="UD-5X5,8" package3d_urn="urn:adsk.eagle:package:23470/1" value="47µF"/>
-<part name="RPROG" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3"/>
+<part name="RPROG" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="4.7k"/>
 <part name="R1" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="10k"/>
 <part name="BACKUP" library="switches" deviceset="SK-12D01-VG4" device=""/>
 <part name="IC1" library="40xx" library_urn="urn:adsk.eagle:library:80" deviceset="4066" device="D" package3d_urn="urn:adsk.eagle:package:823/2"/>
