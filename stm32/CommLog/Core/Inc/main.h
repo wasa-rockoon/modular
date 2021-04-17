@@ -62,8 +62,6 @@ void Error_Handler(void);
 #define LED_GPIO_Port GPIOA
 #define TWE_NRST_Pin GPIO_PIN_11
 #define TWE_NRST_GPIO_Port GPIOA
-#define TWE_PGM_Pin GPIO_PIN_4
-#define TWE_PGM_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
