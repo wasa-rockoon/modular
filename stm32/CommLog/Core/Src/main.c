@@ -17,14 +17,11 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
-
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
-
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-
+#include <command.hpp>
+#include <main.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 
 /* USER CODE END Includes */
@@ -64,6 +61,13 @@ static void MX_CAN_Init(void);
 void TWE_Transmit(char*);
 void CAN_Send(uint8_t *data, int length);
 
+
+void encodeMessage(const Message *m, uint8_t* buf);
+bool decodeMessage(Message *m, const uint8_t* buf);
+
+uint8_t encodeHexMessage(const Message *m, uint8_t* buf);
+bool decodeHexMessage(Message *m, const uint8_t* buf);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -84,7 +88,7 @@ char txbuf[256];
 
 
 
-#define RXBUFSIZE 100
+#define RXBUFSIZE 256
 
 typedef struct {
 	UART_HandleTypeDef *handle;
@@ -126,7 +130,7 @@ uint32_t pullout_ringbuf(UART *uart) {
 	}
 }
 
-char* UART_Read(UART *uart) {
+uint8_t* UART_Read(UART *uart) {
 	uint32_t index = ringbuf_index(uart);
 	uint32_t start = uart->rx_read;
 	if (index == start) return NULL;
@@ -139,10 +143,10 @@ char* UART_Read(UART *uart) {
 
 	if (start == end) return NULL;
 
-	return (char *)uart->rxbuf + start;
+	return uart->rxbuf + start;
 }
 
-char* UART_Read_Until(UART *uart, char term) {
+uint8_t* UART_Read_Until(UART *uart, char term) {
 	uint32_t index = ringbuf_index(uart);
 	uint32_t start = uart->rx_read;
 
@@ -158,7 +162,7 @@ char* UART_Read_Until(UART *uart, char term) {
 			uart->rxbuf[i] = 0;
 			uart->rx_read  = uart->rx_read >= RXBUFSIZE ? index : i + 1;
 			uart->rx_start = uart->rx_read;
-			return (char *)uart->rxbuf + start;
+			return uart->rxbuf + start;
 		}
 		i++;
 	}
@@ -169,11 +173,11 @@ char* UART_Read_Until(UART *uart, char term) {
 	return NULL;
 }
 
-char* UART_Read_Line(UART *uart) {
-	return UART_Read_Until(uart, '\r');
+uint8_t* UART_Read_Line(UART *uart) {
+	return UART_Read_Until(uart, '\n');
 }
 
-void UART_Send(UART *uart, char* str, unsigned int length) {
+void UART_Send(UART *uart, uint8_t* str, unsigned int length) {
 	HAL_UART_Transmit(uart->handle,(uint8_t *)str, length, 0xFFFF);
 }
 
@@ -193,7 +197,6 @@ int main(void)
 
 
   /* USER CODE END 1 */
-  
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -244,25 +247,48 @@ int main(void)
 //  TWE_Transmit("mD\nS");
 //  TWE_Receive_and_Print();
 
+  Message message;
+
+  if (DBG) printf("Start\n");
+
 
   /* USER CODE END 2 */
- 
- 
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
 
-	  char* rx = UART_Read_Line(&twe_uart);
+	  uint8_t* rx = UART_Read_Line(&twe_uart);
 	  if (rx != NULL) {
+
+		  int start;
+		  for (start = 0; start < 64; start++) {
+			  if (rx[start] != '\0' && rx[start] != '\r' && rx[start] != '\n') break;
+		  }
 		  int i;
-		  for (i = 0; i < 8; i++) {
+		  for (i = start; i < 64; i++) {
 			  if (rx[i] == '\0' || rx[i] == '\r' || rx[i] == '\n') break;
 		  }
-		  if (DBG) printf("%s %d\n", rx, i);
-		  CAN_Send((uint8_t*)rx, i);
-		  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+
+		  if (i - start == 16) {
+			  bool success = decodeHexMessage(&message, rx + start);
+
+			  if (DBG) printf("%u %c %u %c %u %u\n", success, message.id, message.seq, message.type, message.index, message.payload);
+
+			  if (success) {
+				  uint8_t tx[8];
+				  encodeMessage(&message, tx);
+
+				  CAN_Send((uint8_t*)(tx), 8);
+				  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+			  }
+		  }
+
+
+//		  if (DBG) printf("%s %d\n", rx + start, i);
+//		  CAN_Send((uint8_t*)(rx + start), i);
+
 	  }
 
 //	  CAN_Send((uint8_t*)"AAA", 3);
@@ -287,7 +313,8 @@ void SystemClock_Config(void)
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
   RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
@@ -297,7 +324,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1;
@@ -433,10 +460,10 @@ static void MX_USART1_UART_Init(void)
 
 }
 
-/** 
+/**
   * Enable DMA controller clock
   */
-static void MX_DMA_Init(void) 
+static void MX_DMA_Init(void)
 {
 
   /* DMA controller clock enable */
@@ -504,19 +531,23 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     Error_Handler();
   }
 
-  char data[10];
-  int i;
-  for (i = 0; i < CanRxHeader.DLC; i++) {
-	  data[i] = (char)CanRxData[i];
-  }
-  data[i++] = 0x0d;
-  data[i]   = '\0';
+  if (CanRxHeader.DLC < 8) return;
 
-  UART_Send(&twe_uart, data, i);
+  Message message;
+  bool success = decodeMessage(&message, CanRxData);
+  if (!success) return;
+
+  uint8_t tx[18];
+  uint8_t count = encodeHexMessage(&message, tx);
+
+
+  UART_Send(&twe_uart, tx, count);
   HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
   if (DBG) printf("%ld %s %ld\n", CanRxHeader.StdId, CanRxData, CanRxHeader.DLC);
 }
+
+
 
 //
 //void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle){
@@ -585,8 +616,8 @@ void Error_Handler(void)
   * @param  line: assert_param error line source number
   * @retval None
   */
-void assert_failed(char *file, uint32_t line)
-{ 
+void assert_failed(uint8_t *file, uint32_t line)
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
