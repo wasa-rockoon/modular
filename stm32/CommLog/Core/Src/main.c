@@ -18,11 +18,11 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <command.hpp>
-#include <main.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
+#include "main.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+#include <command.h>
 
 /* USER CODE END Includes */
 
@@ -61,12 +61,12 @@ static void MX_CAN_Init(void);
 void TWE_Transmit(char*);
 void CAN_Send(uint8_t *data, int length);
 
-
-void encodeMessage(const Message *m, uint8_t* buf);
-bool decodeMessage(Message *m, const uint8_t* buf);
-
-uint8_t encodeHexMessage(const Message *m, uint8_t* buf);
-bool decodeHexMessage(Message *m, const uint8_t* buf);
+//
+//void encodeMessage(const Message *m, uint8_t* buf);
+//bool decodeMessage(Message *m, const uint8_t* buf);
+//
+//uint8_t encodeHexMessage(const Message *m, uint8_t* buf);
+//bool decodeHexMessage(Message *m, const uint8_t* buf);
 
 /* USER CODE END PFP */
 
@@ -75,7 +75,7 @@ bool decodeHexMessage(Message *m, const uint8_t* buf);
 
 extern void initialise_monitor_handles(void);
 
-#define DBG false
+// #define DBG
 
 
 CAN_TxHeaderTypeDef   CanTxHeader;
@@ -84,104 +84,46 @@ uint8_t               CanRxData[8];
 uint32_t              CanTxMailbox;
 
 
-char txbuf[256];
-
-
 
 #define RXBUFSIZE 256
+#define TXBUFSIZE 32
 
-typedef struct {
-	UART_HandleTypeDef *handle;
-	uint8_t  rxbuf[RXBUFSIZE * 2];
-	uint32_t rx_start;
-	uint32_t rx_read;
-	bool     overran;
-} UART;
+uint8_t rxbuf[RXBUFSIZE];
+uint8_t txbuf[TXBUFSIZE];
 
-void UART_Init(UART *uart, UART_HandleTypeDef *handle) {
-	uart->handle    = handle;
-	uart->rx_start  = handle->hdmarx->Instance->CNDTR == 0
-					? 0
-					: RXBUFSIZE - handle->hdmarx->Instance->CNDTR;
-	uart->rx_read   = uart->rx_start;
-	uart->overran   = false;
-	HAL_UART_Receive_DMA(handle, uart->rxbuf, RXBUFSIZE);
+unsigned rx_read = 0;
+
+void UART_Init() {
+	rx_read = huart1.hdmarx->Instance->CNDTR == 0
+			? 0
+			: RXBUFSIZE - huart1.hdmarx->Instance->CNDTR;
+	HAL_UART_Receive_DMA(&huart1, rxbuf, RXBUFSIZE);
 }
 
-uint32_t ringbuf_index(UART *uart) {
-	volatile uint32_t cndtr = uart->handle->hdmarx->Instance->CNDTR;
-	return RXBUFSIZE - cndtr;
-}
+unsigned UART_Read(uint8_t** buf) {
+	// printf("read %d %d \n", huart1.hdmarx->Instance->CNDTR, rx_read);
+	unsigned index = RXBUFSIZE - huart1.hdmarx->Instance->CNDTR;
+	if (index == RXBUFSIZE) index = 0;
 
-uint32_t pullout_ringbuf(UART *uart) {
-	volatile uint32_t *cndtr = &(uart->handle->hdmarx->Instance->CNDTR);
-	uint32_t index = ringbuf_index(uart);
-	if (index < uart->rx_read) {
-
-		for (int i = 0; i < index; i++) {
-			uart->rxbuf[RXBUFSIZE + i] = uart->rxbuf[i];
-		}
-		return RXBUFSIZE + index;
+	if (index == rx_read) {
+		return 0;
+	}
+	else if (index < rx_read) {
+		*buf = rxbuf + rx_read;
+		unsigned len = RXBUFSIZE - rx_read;
+		rx_read = 0;
+		return len;
 	}
 	else {
-		(*cndtr)++;
-		if (*cndtr >= RXBUFSIZE) *cndtr = 0;
-		return index;
+		*buf = rxbuf + rx_read;
+		unsigned len = index - rx_read;
+		rx_read = index;
+		return len;
 	}
 }
 
-uint8_t* UART_Read(UART *uart) {
-	uint32_t index = ringbuf_index(uart);
-	uint32_t start = uart->rx_read;
-	if (index == start) return NULL;
-
-	uint32_t end = pullout_ringbuf(uart);
-
-	uart->rxbuf[end] = 0;
-	uart->rx_read    = index;
-	uart->rx_start   = index;
-
-	if (start == end) return NULL;
-
-	return uart->rxbuf + start;
-}
-
-uint8_t* UART_Read_Until(UART *uart, char term) {
-	uint32_t index = ringbuf_index(uart);
-	uint32_t start = uart->rx_read;
-
-	if (index == uart->rx_start ||
-		index + RXBUFSIZE == uart->rx_start) return NULL;
-
-	uint32_t end = pullout_ringbuf(uart);
-
-	int i = uart->rx_start;
-	while (i < end) {
-		if (uart->rxbuf[i] == term) {
-
-			uart->rxbuf[i] = 0;
-			uart->rx_read  = uart->rx_read >= RXBUFSIZE ? index : i + 1;
-			uart->rx_start = uart->rx_read;
-			return uart->rxbuf + start;
-		}
-		i++;
-	}
-	uart->rx_start = i;
-	if (uart->rx_read != uart->rx_start) {
-//		printf("###\n");
-	}
-	return NULL;
-}
-
-uint8_t* UART_Read_Line(UART *uart) {
-	return UART_Read_Until(uart, '\n');
-}
-
-void UART_Send(UART *uart, uint8_t* str, unsigned int length) {
-	HAL_UART_Transmit(uart->handle,(uint8_t *)str, length, 0xFFFF);
-}
-
-UART twe_uart;
+HexChannel twe_channel;
+CANChannel can_channel;
 
 /* USER CODE END 0 */
 
@@ -193,7 +135,9 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 
-	if (DBG) initialise_monitor_handles();
+#ifdef DBG
+	initialise_monitor_handles();
+#endif
 
 
   /* USER CODE END 1 */
@@ -223,7 +167,7 @@ int main(void)
 
 //  HAL_UART_Receive_IT(&huart1, rxbuf, RXSIZE);
 
-  UART_Init(&twe_uart, &huart1);
+  UART_Init();
 
 
   // Reset TWELITE
@@ -247,10 +191,10 @@ int main(void)
 //  TWE_Transmit("mD\nS");
 //  TWE_Receive_and_Print();
 
-  Message message;
 
-  if (DBG) printf("Start\n");
-
+#ifdef DBG
+  printf("Start\n");
+#endif
 
   /* USER CODE END 2 */
 
@@ -259,37 +203,63 @@ int main(void)
   while (1)
   {
 
-	  uint8_t* rx = UART_Read_Line(&twe_uart);
-	  if (rx != NULL) {
+	  uint8_t* rx;
+	  unsigned len = UART_Read(&rx);
 
-		  int start;
-		  for (start = 0; start < 64; start++) {
-			  if (rx[start] != '\0' && rx[start] != '\r' && rx[start] != '\n') break;
+	  Command *command = readHex(&twe_channel, rx, len);
+
+#ifdef DBG
+	  if (len > 0) {
+		  //printf("uart %.*s (%d)\n", len, rx, len);
+	  }
+	  if (command) {
+		  printCommand(command);
+	  }
+#endif
+	  if (command) {
+		  while (true) {
+			  uint8_t tx[8];
+			  int remains = writeCAN(&can_channel, command, tx);
+			  CAN_Send(tx, 8);
+
+			  //HAL_Delay(10);
+
+			  if (remains == 0) break;
 		  }
-		  int i;
-		  for (i = start; i < 64; i++) {
-			  if (rx[i] == '\0' || rx[i] == '\r' || rx[i] == '\n') break;
-		  }
+		  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+	  }
 
-		  if (i - start == 16) {
-			  bool success = decodeHexMessage(&message, rx + start);
-
-			  if (DBG) printf("%u %c %u %c %u %u\n", success, message.id, message.seq, message.type, message.index, message.payload);
-
-			  if (success) {
-				  uint8_t tx[8];
-				  encodeMessage(&message, tx);
-
-				  CAN_Send((uint8_t*)(tx), 8);
-				  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-			  }
-		  }
+//	  uint8_t* rx = UART_Read_Line(&twe_uart);
+//	  if (rx != NULL) {
+//
+//		  int start;
+//		  for (start = 0; start < 64; start++) {
+//			  if (rx[start] != '\0' && rx[start] != '\r' && rx[start] != '\n') break;
+//		  }
+//		  int i;
+//		  for (i = start; i < 64; i++) {
+//			  if (rx[i] == '\0' || rx[i] == '\r' || rx[i] == '\n') break;
+//		  }
+//
+//		  if (i - start == 16) {
+//			  bool success = decodeHexMessage(&message, rx + start);
+//
+//			  if (DBG) printf("%u %c %u %c %u %u\n", success, message.id, message.seq, message.type, message.index, message.payload);
+//
+//			  if (success) {
+//				  uint8_t tx[8];
+//				  encodeMessage(&message, tx);
+//
+//				  CAN_Send((uint8_t*)(tx), 8);
+//				  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+//			  }
+//		  }
 
 
 //		  if (DBG) printf("%s %d\n", rx + start, i);
 //		  CAN_Send((uint8_t*)(rx + start), i);
 
-	  }
+//	  }
 
 //	  CAN_Send((uint8_t*)"AAA", 3);
 //	  HAL_Delay(1000);
@@ -324,6 +294,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+
   /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
@@ -505,11 +476,29 @@ static void MX_GPIO_Init(void)
 
 
 void CAN_Send(uint8_t *data, int length) {
+	int i = 0;
+
 	CanTxHeader.DLC = length;
 	if (HAL_CAN_AddTxMessage(&hcan, &CanTxHeader, data, &CanTxMailbox) != HAL_OK) {
 		/* Transmission request Error */
 		Error_Handler();
 	}
+
+//	uint32_t fl = HAL_CAN_GetTxMailboxesFreeLevel(&hcan);
+//
+	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) != 3) {
+		i++;
+		if (i > 10000000) break;
+ 	}
+
+	//HAL_Delay(1);
+
+#ifdef DBG
+	for (int n = 0; n < 8; n++) {
+		printf("%X ", data[n]);
+	}
+	printf("\n");
+#endif
 }
 
 _Bool CAN_Received(uint32_t id, uint8_t *data, uint32_t length) {
@@ -532,19 +521,21 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
   }
 
   if (CanRxHeader.DLC < 8) return;
-
-  Message message;
-  bool success = decodeMessage(&message, CanRxData);
-  if (!success) return;
-
-  uint8_t tx[18];
-  uint8_t count = encodeHexMessage(&message, tx);
-
-
-  UART_Send(&twe_uart, tx, count);
+//
+//  Message message;
+//  bool success = decodeMessage(&message, CanRxData);
+//  if (!success) return;
+//
+//  uint8_t tx[18];
+//  uint8_t count = encodeHexMessage(&message, tx);
+//
+//
+//  UART_Send(&twe_uart, tx, count);
   HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
-  if (DBG) printf("%ld %s %ld\n", CanRxHeader.StdId, CanRxData, CanRxHeader.DLC);
+#ifdef DBG
+  printf("%ld %s %ld\n", CanRxHeader.StdId, CanRxData, CanRxHeader.DLC);
+#endif
 }
 
 
@@ -624,5 +615,3 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

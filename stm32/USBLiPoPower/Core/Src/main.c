@@ -18,12 +18,13 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <command.hpp>
 #include "main.h"
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
+#include "command.h"
 
 //#include "usbd_cdc_if.h"
 
@@ -44,7 +45,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-CAN_HandleTypeDef hcan;
+ CAN_HandleTypeDef hcan;
 
 /* USER CODE BEGIN PV */
 
@@ -68,7 +69,12 @@ uint32_t              CanTxMailbox;
 
 #define LOOP_PERIOD         100
 
-//extern void initialise_monitor_handles(void);
+//#define DBG
+
+extern void initialise_monitor_handles(void);
+
+HexChannel usb_channel;
+CANChannel can_channel;
 
 /* USER CODE END 0 */
 
@@ -80,7 +86,9 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 
-//	initialise_monitor_handles();
+#ifdef DBG
+	initialise_monitor_handles();
+#endif
 
   /* USER CODE END 1 */
 
@@ -106,16 +114,9 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
-
-//  HAL_Delay(1000);
-//
-//  HAL_GPIO_WritePin(Ignite_GPIO_Port, Ignite_Pin, GPIO_PIN_SET);
-//
-//  HAL_Delay(1000);
-//
-//  HAL_GPIO_WritePin(Ignite_GPIO_Port, Ignite_Pin, GPIO_PIN_RESET);
-
-//  printf("Start\n");
+#ifdef DBG
+  printf("Start\n");
+#endif
 
 
   /* USER CODE END 2 */
@@ -124,8 +125,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, SET);
 
+	  //　CAN_Send("ABCDEFGH", 8);
 
 	  HAL_Delay(LOOP_PERIOD);
     /* USER CODE END WHILE */
@@ -156,6 +158,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+
   /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
@@ -175,9 +178,11 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+
   /** Enable the SYSCFG APB clock
   */
   __HAL_RCC_CRS_CLK_ENABLE();
+
   /** Configures CRS
   */
   RCC_CRSInitStruct.Prescaler = RCC_CRS_SYNC_DIV1;
@@ -298,11 +303,17 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 void CAN_Send(uint8_t *data, int length) {
+	//while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) == 0);
 	CanTxHeader.DLC = length;
 	if (HAL_CAN_AddTxMessage(&hcan, &CanTxHeader, data, &CanTxMailbox) != HAL_OK) {
 		/* Transmission request Error */
 		Error_Handler();
 	}
+//	int i = 0;
+//	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) != 3) {
+//		i++;
+//		if (i > 10000) break;
+//	}
 }
 
 _Bool CAN_Received(uint32_t id, uint8_t *data, uint32_t length) {
@@ -324,19 +335,42 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     Error_Handler();
   }
 
-  if (CanRxHeader.DLC < 8) return;
+#ifdef DBG
+  //printf("r %d\n", CanRxHeader.DLC);
+#endif
 
-  Message message;
-  bool success = decodeMessage(&message, CanRxData);
-  if (!success) return;
+  if (CanRxHeader.DLC != 8) return;
 
-  uint8_t tx[20];
-  uint8_t count = encodeHexMessage(&message, tx);
+  Command* command = readCAN(&can_channel, CanRxData);
+
+  if (command) {
+#ifdef DBG
+	  printCommand(command);
+#endif
+
+	  uint8_t tx[11];
+	  while (true) {
+		  int len;
+		  int remains = writeHex(&usb_channel, command, tx, &len);
+		  CDC_Transmit_FS(tx, len);
+
+		  if (remains == 0) break;
+	  }
+  }
+
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, RESET);
 
 
-  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+//
+//  Message message;
+//  bool success = decodeMessage(&message, CanRxData);
+//  if (!success) return;
+//
+//  uint8_t tx[20];
+//  uint8_t count = encodeHexMessage(&message, tx);
 
-  CDC_Transmit_FS(tx, count);
+
+  //CDC_Transmit_FS(tx, count);
 //  printf(CanRxData);
 
 }
@@ -370,5 +404,3 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

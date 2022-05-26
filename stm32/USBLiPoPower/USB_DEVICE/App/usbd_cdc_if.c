@@ -20,7 +20,6 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
-#include <command.hpp>
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN INCLUDE */
@@ -269,29 +268,29 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   static uint8_t rx[32];
   static uint8_t count = 0;
 
-  for (int i = 0; i < *Len; i++) {
-	  rx[count] = Buf[i];
-
-	  if (Buf[i] == 0x0d || Buf[i] == 0x0a) {
-		  Message message;
-		  bool success = decodeHexMessage(&message, rx);
-
-		  if (count >= 4 && success) {
-			  uint8_t tx[8];
-			  encodeMessage(&message, tx);
-
-			  CAN_Send((uint8_t*)(tx), 8);
-			  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
-		  }
-
-		  CDC_Transmit_FS(rx, count);
-
-		  count = 0;
-	  }
-	  else {
-		  count++;
-	  }
-  }
+//  for (int i = 0; i < *Len; i++) {
+//	  rx[count] = Buf[i];
+//
+//	  if (Buf[i] == 0x0d || Buf[i] == 0x0a) {
+//		  Message message;
+//		  bool success = decodeHexMessage(&message, rx);
+//
+//		  if (count >= 4 && success) {
+//			  uint8_t tx[8];
+//			  encodeMessage(&message, tx);
+//
+//			  CAN_Send((uint8_t*)(tx), 8);
+//			  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+//		  }
+//
+//		  CDC_Transmit_FS(rx, count);
+//
+//		  count = 0;
+//	  }
+//	  else {
+//		  count++;
+//	  }
+//  }
 
 
   return (USBD_OK);
@@ -334,5 +333,3 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
 /**
   * @}
   */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
