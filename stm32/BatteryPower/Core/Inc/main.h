@@ -60,6 +60,16 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED_Pin GPIO_PIN_0
 #define LED_GPIO_Port GPIOA
+#define C_VDD_Pin GPIO_PIN_4
+#define C_VDD_GPIO_Port GPIOA
+#define C_VCC_Pin GPIO_PIN_5
+#define C_VCC_GPIO_Port GPIOA
+#define V_VPP_Pin GPIO_PIN_7
+#define V_VPP_GPIO_Port GPIOA
+#define V_VDD_Pin GPIO_PIN_0
+#define V_VDD_GPIO_Port GPIOB
+#define V_VCC_Pin GPIO_PIN_1
+#define V_VCC_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
@@ -69,5 +79,3 @@ void Error_Handler(void);
 #endif
 
 #endif /* __MAIN_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
