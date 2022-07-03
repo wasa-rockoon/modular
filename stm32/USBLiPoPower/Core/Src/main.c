@@ -20,6 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "usb_device.h"
+#include "usbd_cdc_if.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -316,16 +317,6 @@ void CAN_Send(uint8_t *data, int length) {
 //	}
 }
 
-_Bool CAN_Received(uint32_t id, uint8_t *data, uint32_t length) {
-	if (CanRxHeader.StdId != id)         return 0;
-	if (CanRxHeader.IDE   != CAN_ID_STD) return 0;
-	if (CanRxHeader.DLC   != length)     return 0;
-	for (int i = 0; i < length; i++) {
-		if (CanRxData[i] != data[i]) return 0;
-	}
-	return 1;
-}
-
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
   /* Get RX message */
@@ -352,7 +343,12 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 	  while (true) {
 		  int len;
 		  int remains = writeHex(&usb_channel, command, tx, &len);
-		  CDC_Transmit_FS(tx, len);
+		  uint8_t result = CDC_Transmit_FS(tx, len);
+
+		  if (result == USBD_BUSY) {
+			  HAL_Delay(1);
+			  result = CDC_Transmit_FS(tx, len);
+		  }
 
 		  if (remains == 0) break;
 	  }

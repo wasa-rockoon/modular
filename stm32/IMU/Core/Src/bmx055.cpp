@@ -6,10 +6,15 @@
  */
 
 
-#include <bmx055.hpp>
-#include <main.h>
+#include "bmx055.hpp"
 
-BMX055::BMX055(SPI_HandleTypeDef& spi): Accl(Accelerometer(spi)), Gyro(Gyroscope(spi)), Mag(Magnetometer(spi)) {}
+BMX055::BMX055(SPI_HandleTypeDef& spi,
+		GPIO_TypeDef* accl_cs_port, uint16_t accl_cs_pin,
+		GPIO_TypeDef* gyro_cs_port, uint16_t gyro_cs_pin,
+		GPIO_TypeDef* mag_cs_port, uint16_t mag_cs_pin):
+				Accl(Accelerometer(spi, accl_cs_port, accl_cs_pin)),
+				Gyro(Gyroscope(spi, gyro_cs_port, gyro_cs_pin)),
+				Mag(Magnetometer(spi, mag_cs_port, mag_cs_pin)) {}
 
 
 uint8_t BMX055::begin() {
@@ -52,36 +57,35 @@ void BMX055::reset() {
 
 // Function ====================================================================
 
-Function::Function(SPI_HandleTypeDef& spi): spi(spi) {}
+Function::Function(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16_t cs_pin):
+		spi(spi), cs_port(cs_port), cs_pin(cs_pin) {}
 
 
 void Function::writeRegister(uint8_t addr, uint8_t value) {
 	addr = addr & 0x7F;
 
-	sellect();
-	auto ts = HAL_SPI_Transmit(&spi, &addr, 1, 100);
-	auto rs = HAL_SPI_Transmit(&spi, &value, 1, 100);
-
-	ts + rs;
-	unsellect();
+	HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);
+	HAL_SPI_Transmit(&spi, &addr, 1, 100);
+	HAL_SPI_Transmit(&spi, &value, 1, 100);
+	HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
 }
 
 uint8_t Function::readRegister(uint8_t addr) {
 	addr = addr | 0x80;
 	uint8_t value;
 
-	sellect();
-	auto ts = HAL_SPI_Transmit(&spi, &addr, 1, 100);
-	auto rs = HAL_SPI_Receive(&spi, &value, 1, 100);
-	unsellect();
-	// printf("r  %d %d\n", ts, rs);
+	HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);
+	HAL_SPI_Transmit(&spi, &addr, 1, 100);
+	HAL_SPI_Receive(&spi, &value, 1, 100);
+	HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
 
-	return value + ts + rs;
+	return value;
 }
 
 
 // Accelerometer ===============================================================
-Accelerometer::Accelerometer(SPI_HandleTypeDef& spi): Function(spi) {}
+Accelerometer::Accelerometer(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16_t cs_pin):
+		Function(spi, cs_port, cs_pin) {}
 
 void Accelerometer::setRange(AcclRange range) {
     uint8_t value;
@@ -116,17 +120,10 @@ Vec3 Accelerometer::read() {
     return { x * factor, y * factor, z * factor };
 }
 
-void Accelerometer::sellect() {
-	HAL_GPIO_WritePin(CS_ACCEL_GPIO_Port, CS_ACCEL_Pin, GPIO_PIN_RESET);
-}
-void Accelerometer::unsellect() {
-	HAL_GPIO_WritePin(CS_ACCEL_GPIO_Port, CS_ACCEL_Pin, GPIO_PIN_SET);
-}
-
-
 
 // Gyroscope ===================================================================
-Gyroscope::Gyroscope(SPI_HandleTypeDef& spi): Function(spi) {}
+Gyroscope::Gyroscope(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16_t cs_pin):
+		Function(spi, cs_port, cs_pin) {}
 
 Vec3 Gyroscope::read() {
     unsigned int data[6];
@@ -163,17 +160,10 @@ void Gyroscope::setRange(GyroRange range) {
     factor = range / 32768.0;
 }
 
-void Gyroscope::sellect() {
-	HAL_GPIO_WritePin(CS_GYRO_GPIO_Port, CS_GYRO_Pin, GPIO_PIN_RESET);
-}
-void Gyroscope::unsellect() {
-	HAL_GPIO_WritePin(CS_GYRO_GPIO_Port, CS_GYRO_Pin, GPIO_PIN_SET);
-}
-
-
 
 // Magnetometer ================================================================
-Magnetometer::Magnetometer(SPI_HandleTypeDef& spi): Function(spi) {}
+Magnetometer::Magnetometer(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16_t cs_pin):
+		Function(spi, cs_port, cs_pin) {}
 
 Vec3 Magnetometer::read() {
     uint8_t data[6];
@@ -206,12 +196,5 @@ void Magnetometer::resetCalibration() {
   center.y = 0;
   center.z = 0;
   radius = 10;
-}
-
-void Magnetometer::sellect() {
-	HAL_GPIO_WritePin(CS_MAG_GPIO_Port, CS_MAG_Pin, GPIO_PIN_RESET);
-}
-void Magnetometer::unsellect() {
-	HAL_GPIO_WritePin(CS_MAG_GPIO_Port, CS_MAG_Pin, GPIO_PIN_SET);
 }
 

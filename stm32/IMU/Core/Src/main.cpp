@@ -25,6 +25,7 @@
 // #include <command.h>
 #include <cstdio>
 #include "bmx055.hpp"
+#include "bmp280.hpp"
 #include "algebra.hpp"
 
 /* USER CODE END Includes */
@@ -172,13 +173,29 @@ int main(void)
   // UART_Init();
 
 
-  BMX055 bmx055(hspi2);
+  BMX055 bmx055(hspi2, CS_ACCEL_GPIO_Port, CS_ACCEL_Pin,
+		  	  	  	   CS_GYRO_GPIO_Port, CS_GYRO_Pin,
+					   CS_MAG_GPIO_Port, CS_MAG_Pin);
+  BMP280 bmp280(hspi2, CS_PRESS_GPIO_Port, CS_PRESS_Pin);
 
 #ifdef DEBUG
   printf("Start\n");
 #endif
 
-  bmx055.begin();
+//  HAL_GPIO_WritePin(CS_PRESS_GPIO_Port, CS_PRESS_Pin, GPIO_PIN_RESET);
+
+  float qnh_hpa = 1013.25;
+
+  bool bmx055_ok = bmx055.begin();
+  bool bmp280_ok = bmp280.begin();
+
+  printf("%d %d \n", bmx055_ok, bmp280_ok);
+
+  bmp280.setSampling(BMP280::MODE_NORMAL,     /* Operating Mode. */
+		  	  	     BMP280::SAMPLING_X2,     /* Temp. oversampling */
+					 BMP280::SAMPLING_X16,    /* Pressure oversampling */
+					 BMP280::FILTER_X16,      /* Filtering. */
+					 BMP280::STANDBY_MS_500); /* Standby time. */
 
 //  bmx055.Gyro.sellect();
 
@@ -199,6 +216,8 @@ int main(void)
 	  Vec3 gyro = bmx055.Gyro.read();
 	  Vec3 mag = bmx055.Mag.read();
 
+	  float altitude = bmp280.readAltitude(qnh_hpa);
+
 #ifdef DEBUG
 	  char buf[64];
 	  accel.show(buf);
@@ -208,9 +227,12 @@ int main(void)
 	  mag.show(buf);
 	  printf("M %s\n", buf);
 
+	  printf("P %d\n", (int)(altitude * 1000));
+
 #endif
 
-	  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+	  if (altitude > 0)
+		  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
   }
 

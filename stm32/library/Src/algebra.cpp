@@ -81,7 +81,7 @@ void Vec3::show(char* buf) const {
 	int x_ = (int)(x * 1000) % 1000;
 	int y_ = (int)(y * 1000) % 1000;
 	int z_ = (int)(z * 1000) % 1000;
-    sprintf(buf, "[%d.%3d, %d.%3d, %d.%3d]", (int)x, abs(x_), (int)y, abs(y_), (int)z, abs(z_));
+    sprintf(buf, "[%d.%03d, %d.%03d, %d.%03d]", (int)x, abs(x_), (int)y, abs(y_), (int)z, abs(z_));
 }
 
 
@@ -159,7 +159,7 @@ void Quaternion::show(char* buf) const {
 	int b_ = (int)(b * 1000) % 1000;
 	int c_ = (int)(c * 1000) % 1000;
 	int d_ = (int)(d * 1000) % 1000;
-    sprintf(buf, "[%d.%3d, %d.%3d, %d.%3d, %d.%3d]", (int)a, abs(a_), (int)b, abs(b_), (int)c, abs(c_), (int)d, abs(d_));
+    sprintf(buf, "[%d.%03d, %d.%03d, %d.%03d, %d.%03d]", (int)a, abs(a_), (int)b, abs(b_), (int)c, abs(c_), (int)d, abs(d_));
 }
 
 

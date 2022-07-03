@@ -31,31 +31,26 @@ enum GyroRange: uint16_t {
 
 class Function {
 public:
-	Function(SPI_HandleTypeDef& spi);
+	Function(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16_t cs_pin);
 
     uint8_t begin();
 
     void writeRegister(uint8_t addr, uint8_t value);
     uint8_t readRegister(uint8_t addr);
 
-//protected:
+protected:
     SPI_HandleTypeDef& spi;
-
-    virtual void sellect() = 0;
-    virtual void unsellect() = 0;
+    GPIO_TypeDef* cs_port;
+    uint16_t cs_pin;
 };
 
 class Accelerometer: public Function {
 public:
 
-	Accelerometer(SPI_HandleTypeDef& spi);
+	Accelerometer(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16_t cs_pin);
 
     Vec3 read();
     void setRange(AcclRange range);
-
-//protected:
-    void sellect();
-    void unsellect();
 
 private:
     float factor;
@@ -63,14 +58,10 @@ private:
 
 class Gyroscope: public Function {
 public:
-	Gyroscope(SPI_HandleTypeDef& spi);
+	Gyroscope(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16_t cs_pin);
 
     Vec3 read();
     void setRange(GyroRange range);
-
-//protected:
-    void sellect();
-    void unsellect();
 
 private:
     float factor;
@@ -79,7 +70,7 @@ private:
 
 class Magnetometer: public Function {
 public:
-	Magnetometer(SPI_HandleTypeDef& spi);
+	Magnetometer(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16_t cs_pin);
 
     Vec3 center;
     float radius = 10;
@@ -87,10 +78,6 @@ public:
     Vec3 read();
     float calibrate(Vec3 mag, float gain = 0.0001);
     void resetCalibration();
-
-//protected:
-    void sellect();
-    void unsellect();
 
 };
 
@@ -102,7 +89,10 @@ public:
     Gyroscope     Gyro;
     Magnetometer  Mag;
 
-    BMX055(SPI_HandleTypeDef& spi);
+    BMX055(SPI_HandleTypeDef& spi,
+    		GPIO_TypeDef* accl_cs_port, uint16_t accl_cs_pin,
+			GPIO_TypeDef* gyro_cs_port, uint16_t gyro_cs_pin,
+			GPIO_TypeDef* mag_cs_port, uint16_t mag_cs_pin);
 
     uint8_t begin();
     void reset();
