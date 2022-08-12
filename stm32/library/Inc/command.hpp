@@ -14,6 +14,7 @@
 #include <stdbool.h>
 
 #define NUM_STREAMS 4
+#define MAX_ENTRIES 16
 
 
 union Payload {
@@ -28,11 +29,16 @@ struct Entry {
     uint8_t type;
     union Payload payload;
 
+    void set(uint8_t type);
+    void set(uint8_t type, const uint8_t* bytes);
+    void set(uint8_t type, int32_t value);
+    void set(uint8_t type, uint32_t value);
+    void set(uint8_t type, float value);
 
-	void encode(uint8_t* buf) const;
-	void encodeHex(uint8_t* buf) const;
-	bool decode(const uint8_t* buf);
-	bool decodeHex(const uint8_t* buf);
+	uint8_t encode(uint8_t* buf) const;
+	uint8_t encodeHex(uint8_t* buf) const;
+	bool decode(const uint8_t* buf, uint8_t len);
+	uint8_t decodeHex(const uint8_t* buf);
 };
 
 struct Command {
@@ -40,11 +46,9 @@ struct Command {
 	uint8_t to;
 	uint8_t from;
 	uint8_t size;
-	Entry* entries;
+	Entry entries[MAX_ENTRIES];
 
-	Command(Entry header);
-	~Command();
-
+	void setHeader(Entry header);
 	Entry getHeader() const;
 };
 
@@ -72,13 +76,20 @@ class HexChannel {
 
 class CANChannel {
 public:
-	Command* receive(uint8_t std_id, const uint8_t* data);
+	Command tx;
+	Command rx;
 
-	void send(const Command* command, void (*send_fun)(const uint8_t* data, uint8_t len));
+	bool receive(uint8_t std_id, const uint8_t* data, uint8_t len);
+
+	uint8_t send(uint8_t& std_id, uint8_t* data, uint8_t& len);
+	void cancelSending();
+
+	bool isReceiving();
+	bool isSending();
 
 private:
-	uint32_t time;
-	ReceivingCommand receivings[NUM_STREAMS];
+	int8_t receiving = -1;
+	int8_t sending = -1;
 };
 
 

@@ -9,23 +9,70 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void Entry::encode(uint8_t* buf) const {
-    buf[0] = type;
-    for (int i = 0; i < 4; i++) buf[i + 1] = payload.bytes[i];
+
+void Entry::set(uint8_t type) {
+	this->type = type, payload.uint = 0;
 }
 
-bool Entry::decode(const uint8_t* buf) {
-	type = buf[0];
-	for (int i = 0; i < 4; i++) payload.bytes[i] = buf[1 + i];
-
-	return true;
+void Entry::set(uint8_t type, const uint8_t* bytes) {
+	this->type = type;
+	for (int i = 0; i < 4; i++) payload.bytes[i] = bytes[i];
 }
 
-void Entry::encodeHex(uint8_t* buf) const {
-    uint8_t data[5] = { type };
-    for (int i = 0; i < 4; i++) data[i + 1] = payload.bytes[i];
+void Entry::set(uint8_t type, int32_t value) {
+	this->type = type;
+	payload.int_ = value;
+}
 
-    for (int i = 0; i < 5; i++) {
+void Entry::set(uint8_t type, uint32_t value) {
+	this->type = type;
+	payload.uint = value;
+}
+
+void Entry::set(uint8_t type, float value) {
+	this->type = type;
+	payload.float_ = value;
+}
+
+uint8_t Entry::encode(uint8_t* buf) const {
+    if (payload.int_ == 0) {
+    	buf[0] = type || 0b10000000;
+    	return 1;
+    }
+    else {
+    	buf[0] = type;
+        for (int i = 0; i < 4; i++) buf[i + 1] = payload.bytes[i];
+        return 5;
+    }
+}
+
+bool Entry::decode(const uint8_t* buf, uint8_t len) {
+	type = buf[0] & 0b01111111;
+	if (len == 5 && !(buf[0] & 0b10000000)) {
+		for (int i = 0; i < 4; i++) payload.bytes[i] = buf[1 + i];
+		return true;
+	}
+	else if (len == 1 && (buf[0] & 0b10000000)) {
+		return true;
+	}
+	else return false;
+}
+
+uint8_t Entry::encodeHex(uint8_t* buf) const {
+    uint8_t data[5];
+    uint8_t len;
+
+    if (payload.int_ == 0) {
+        data[0] = type || 0b10000000;
+        len = 1;
+    }
+    else {
+    	data[0] = type;
+        for (int i = 0; i < 4; i++) data[i + 1] = payload.bytes[i];
+    	len = 5;
+    }
+
+    for (int i = 0; i < len; i++) {
         char hex[3];
         sprintf(hex, "%X", data[i]);
         if (data[i] < 16) {
@@ -37,42 +84,50 @@ void Entry::encodeHex(uint8_t* buf) const {
             buf[i*2+1] = hex[1];
         }
     }
-    buf[10] = '\0';
+    buf[len * 2] = '\0';
+    return len * 2;
 }
 
-bool Entry::decodeHex(const uint8_t* buf) {
+uint8_t Entry::decodeHex(const uint8_t* buf) {
     char *err = nullptr;
     uint8_t data[5];
-    for (int i = 0; i < 5; i++) {
-        char hex[3];
-        hex[0] = buf[2 * i];
-        hex[1] = buf[2 * i + 1];
-        hex[2] = '\0';
-        data[i] = (uint8_t)strtol(hex, &err, 16);
+    char hex[3];
+
+    hex[0] = buf[0];
+    hex[1] = buf[1];
+    hex[2] = '\0';
+    data[0] = (uint8_t)strtol(hex, &err, 16);
+    if (*err != '\0') return 0;
+
+    type = data[0] & 0b01111111;
+
+    if (buf[0] & 0b1000000) {
+    	return 2;
+    	payload.int_ = 0;
     }
-    if (*err != '\0') return false;
-
-    type = data[0];
-    for (int i = 0; i < 4; i++) payload.bytes[i] = data[1 + i];
-
-    return true;
+    else {
+		for (int i = 1; i < 5; i++) {
+			hex[0] = buf[2 * i];
+			hex[1] = buf[2 * i + 1];
+			hex[2] = '\0';
+			data[i] = (uint8_t)strtol(hex, &err, 16);
+		}
+		if (*err != '\0') return false;
+		for (int i = 0; i < 4; i++) payload.bytes[i] = data[1 + i];
+		return 10;
+    }
 }
 
-Command::Command(Entry header) {
+void Command::setHeader(Entry header) {
 	id = header.payload.bytes[0];
 	to = header.payload.bytes[1];
 	from = header.payload.bytes[2];
 	size = header.payload.bytes[3];
-	entries = (Entry *)malloc(sizeof(Entry) * size);
-}
-
-
-Command::~Command() {
-	free(entries);
 }
 
 Entry Command::getHeader() const {
 	Entry header;
+	header.type = 0;
 	header.payload.bytes[0] = id;
 	header.payload.bytes[1] = to;
 	header.payload.bytes[2] = from;
@@ -80,86 +135,63 @@ Entry Command::getHeader() const {
 	return header;
 }
 
-bool ReceivingCommand::start(uint32_t std_id, Entry header, uint32_t time) {
-	recently_used = time;
 
-	this->std_id = std_id;
-	count = 0;
-	command = new Command(header);
-
-	return command->size == 0;
-}
-
-bool ReceivingCommand::addEntry(Entry entry, uint32_t time) {
-	recently_used = time;
-
-	command->entries[count] = entry;
-	count++;
-	if (command->size == count) {
-		std_id = 0;
-		count = 0;
-		return true;
-	}
-	return false;
-}
-
-void ReceivingCommand::abort() {
-	free(command);
-	std_id = 0;
-	count = 0;
-}
-
-inline bool ReceivingCommand::isFree() {
-	return std_id == 0;
-}
-
-Command* CANChannel::receive(uint8_t std_id, const uint8_t* data) {
-
-	time++;
+bool CANChannel::receive(uint8_t std_id, const uint8_t* data, uint8_t len) {
 
 	Entry entry;
-	if (!entry.decode(data)) return nullptr;
-
-	// Add entry to receiving command
-	for (int i = 0; i < NUM_STREAMS; i++) {
-		if (receivings[i].std_id == std_id) {
-			if (receivings[i].addEntry(entry, time)) return receivings[i].command;
-			else return nullptr;
-		}
-	}
+	if (!entry.decode(data, len)) return false;
 
 	// Start receiving new command
-
-	uint8_t lru = 0;
-	uint32_t lru_time = 0;
-	for (int i = 0; i < NUM_STREAMS; i++) {
-
-		if (receivings[i].isFree()) {
-			if (receivings[i].start(std_id, entry, time)) return receivings[i].command;
-			else return nullptr;
-		}
-
-		if (time - receivings[i].recently_used > lru_time) {
-			lru = i;
-			lru_time = time - receivings[i].recently_used;
-		}
+	if (entry.type == 0) {
+		rx.setHeader(entry);
+		receiving = 0;
+	}
+	// Cancel receiving
+	else if (receiving == -1 || std_id != rx.id) {
+		receiving = -1;
+		return false;
+	}
+	// Continue receiving
+	else {
+		rx.entries[receiving] = entry;
+		receiving++;
 	}
 
-	receivings[lru].abort();
-
-	if (receivings[lru].start(std_id, entry, time)) return receivings[lru].command;
-	else return nullptr;
+	if (receiving == rx.size) {
+		receiving = -1;
+		return true;
+	}
+	else return false;
 }
 
-void CANChannel::send(const Command* command, void (*send_fun)(const uint8_t* data, uint8_t len)) {
-	uint8_t buf[5];
-
-	Entry header = command->getHeader();
-	header.encode(buf);
-	send_fun(buf, 5);
-
-	for (int n = 0; n < command->size; n++) {
-		command->entries[n].encode(buf);
-		send_fun(buf, 5);
+uint8_t CANChannel::send(uint8_t& std_id, uint8_t* data, uint8_t& len) {
+	std_id = tx.id;
+	if (receiving != -1) {
+		len = 0;
+		return tx.size;
 	}
+	if (sending == -1) {
+		Entry header = tx.getHeader();
+		len = header.encode(data);
+		sending = 0;
+	}
+	else {
+		len = tx.entries[sending].encode(data);
+		sending++;
+	}
+	int remains = tx.size - sending;
+	if (remains == 0) sending = -1;
+	return remains;
+}
+
+void CANChannel::cancelSending() {
+	sending = -1;
+}
+
+bool CANChannel::isReceiving() {
+	return receiving != -1;
+}
+
+bool CANChannel::isSending() {
+	return sending != -1;
 }

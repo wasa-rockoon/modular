@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE eagle SYSTEM "eagle.dtd">
-<eagle version="9.5.2">
+<eagle version="9.6.2">
 <drawing>
 <settings>
 <setting alwaysvectorfont="no"/>
@@ -17407,6 +17407,11 @@ Source: http://www.murata.com .. GRM43DR72E224KW01.pdf</description>
 <sheets>
 <sheet>
 <plain>
+<text x="50.8" y="-7.62" size="1.778" layer="97">***FIX***
+920_TRX: 30 -&gt; 12
+920_RTX: 31 -&gt; 38
+SD_SS: None -&gt; Vdd
+SD_SW: 12 -&gt; 13</text>
 </plain>
 <instances>
 <instance part="U$2" gate="G$1" x="142.24" y="160.02" smashed="yes" rot="MR270"/>
@@ -18479,6 +18484,10 @@ Source: http://www.murata.com .. GRM43DR72E224KW01.pdf</description>
 </schematic>
 </drawing>
 <compatibility>
+<note version="6.3" minversion="6.2.2" severity="warning">
+Since Version 6.2.2 text objects can contain more than one line,
+which will not be processed correctly with this version.
+</note>
 <note version="8.2" severity="warning">
 Since Version 8.2, EAGLE supports online libraries. The ids
 of those online libraries will not be understood (or retained)

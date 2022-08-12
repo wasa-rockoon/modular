@@ -24,6 +24,8 @@
 /* USER CODE BEGIN Includes */
 
 #include <stdlib.h>
+#include <cstdio>
+#include "command.hpp"
 
 /* USER CODE END Includes */
 
@@ -38,13 +40,17 @@
 #define SAMPLE_FREQ 10
 #define SEND_FREQ 1
 
+#define ENABLE_TLM
+
 #define CURRENT_FILTER_A 0.5
-#define VDD_CURRENT_OFFSET 0.4
-#define VCC_CURRENT_OFFSET 0.0
+#define VDD_CURRENT_OFFSET 0.0
+#define VCC_CURRENT_OFFSET 0.4
 #define VPP_FIX (8.08 / 8.20)
 #define VCC_FIX (5.02 / 4.69)
 #define VDD_FIX (3.35 / 3.19)
 
+
+#define SEND_TIMEOUT_TICK 100000
 
 /* USER CODE END PD */
 
@@ -79,11 +85,23 @@ static void MX_TIM2_Init(void);
 static void MX_TIM14_Init(void);
 /* USER CODE BEGIN PFP */
 
+extern "C" void initialise_monitor_handles(void);
+void CAN_Send();
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-extern void initialise_monitor_handles(void);
+
+CANChannel can;
+
+CAN_TxHeaderTypeDef   CanTxHeader;
+CAN_RxHeaderTypeDef   CanRxHeader;
+uint8_t               CanTxData[8];
+uint8_t               CanRxData[8];
+uint32_t              CanTxMailbox;
+
+unsigned sending_count = 0;
 
 uint16_t adc_values[10];
 
@@ -119,6 +137,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		printf("Vdd: %d.%03d V, %d mA\n", (int)vdd_V, abs((int)(vdd_V * 1000) % 1000), (int)(vdd_A * 1000));
 #endif
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+
+#ifdef ENABLE_TLM
+		can.tx.id   = 'B';
+		can.tx.from = 0;
+		can.tx.to   = 'T';
+		can.tx.size = 5;
+
+		can.tx.entries[0].set('P', vpp_V);
+		can.tx.entries[1].set('C', vcc_V);
+		can.tx.entries[2].set('D', vdd_V);
+		can.tx.entries[3].set('c', vcc_A);
+		can.tx.entries[4].set('d', vdd_A);
+
+		CAN_Send();
+#endif
     }
 }
 /* USER CODE END 0 */
@@ -173,6 +206,16 @@ int main(void)
 
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 
+#ifdef ENABLE_TLM
+  can.tx.id   = 'R';
+  can.tx.from = 0;
+  can.tx.to   = 'T';
+  can.tx.size = 1;
+
+  can.tx.entries[0].set('B');
+
+  CAN_Send();
+#endif
 
   /* USER CODE END 2 */
 
@@ -184,7 +227,13 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  HAL_Delay(1000);
+	  HAL_Delay(1);
+	  if (can.isSending()) sending_count++;
+
+	  if (sending_count > 10) {
+		  sending_count = 0;
+		  can.cancelSending();
+	  }
 
 #ifndef DEBUG
 	  HAL_IWDG_Refresh(&hiwdg);
@@ -333,11 +382,11 @@ static void MX_CAN_Init(void)
 
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN;
-  hcan.Init.Prescaler = 8;
+  hcan.Init.Prescaler = 24;
   hcan.Init.Mode = CAN_MODE_NORMAL;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan.Init.TimeSeg1 = CAN_BS1_4TQ;
-  hcan.Init.TimeSeg2 = CAN_BS2_1TQ;
+  hcan.Init.TimeSeg1 = CAN_BS1_12TQ;
+  hcan.Init.TimeSeg2 = CAN_BS2_3TQ;
   hcan.Init.TimeTriggeredMode = DISABLE;
   hcan.Init.AutoBusOff = DISABLE;
   hcan.Init.AutoWakeUp = DISABLE;
@@ -349,6 +398,39 @@ static void MX_CAN_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN_Init 2 */
+
+  // Configure Filter
+
+  CAN_FilterTypeDef  fc;
+
+  fc.FilterBank           = 0;
+  fc.FilterMode           = CAN_FILTERMODE_IDMASK;
+  fc.FilterScale          = CAN_FILTERSCALE_32BIT;
+  fc.FilterIdHigh         = 0x0000;
+  fc.FilterIdLow          = 0x0000;
+  fc.FilterMaskIdHigh     = 0x0000;
+  fc.FilterMaskIdLow      = 0x0000;
+  fc.FilterFIFOAssignment = CAN_RX_FIFO0;
+  fc.FilterActivation     = ENABLE;
+  fc.SlaveStartFilterBank = 14;
+
+  if (HAL_CAN_ConfigFilter(&hcan, &fc) != HAL_OK)
+  {
+    /* Filter configuration Error */
+    Error_Handler();
+  }
+
+  if (HAL_CAN_Start(&hcan) != HAL_OK)
+  {
+    /* Start Error */
+    Error_Handler();
+  }
+
+  if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING | CAN_IT_TX_MAILBOX_EMPTY) != HAL_OK)
+  {
+    /* Notification Error */
+    Error_Handler();
+  }
 
   /* USER CODE END CAN_Init 2 */
 
@@ -427,6 +509,7 @@ static void MX_TIM2_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN TIM2_Init 2 */
+  htim2.Init.Period = 1000 / SAMPLE_FREQ;
 
   /* USER CODE END TIM2_Init 2 */
 
@@ -458,6 +541,7 @@ static void MX_TIM14_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN TIM14_Init 2 */
+  htim14.Init.Period = 1000 / SEND_FREQ;
 
   /* USER CODE END TIM14_Init 2 */
 
@@ -474,7 +558,7 @@ static void MX_DMA_Init(void)
 
   /* DMA interrupt init */
   /* DMA1_Channel1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
 
 }
@@ -505,6 +589,65 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
+{
+#ifdef DEBUG
+		printf("Complete %c\n", CanTxHeader.StdId);
+#endif
+
+	sending_count = 0;
+
+	if (can.isSending()) CAN_Send();
+}
+void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan)
+{
+#ifdef DEBUG
+		printf("Complete %c\n", CanTxHeader.StdId);
+#endif
+
+	sending_count = 0;
+
+	if (can.isSending()) CAN_Send();
+}
+void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan)
+{
+#ifdef DEBUG
+		printf("Complete %c\n", CanTxHeader.StdId);
+#endif
+
+	sending_count = 0;
+
+	if (can.isSending()) CAN_Send();
+}
+
+void CAN_Send() {
+	uint8_t std_id, len;
+
+	while (can.isReceiving());
+
+	can.send(std_id, CanTxData, len);
+
+	if (len == 0) return;
+
+	CanTxHeader.StdId = std_id;
+	CanTxHeader.DLC = len;
+
+	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) != 3);
+
+	volatile unsigned tick = 0;
+	while (tick < 100000) tick++;
+
+	if (HAL_CAN_AddTxMessage(&hcan, &CanTxHeader, CanTxData, &CanTxMailbox) != HAL_OK) {
+		Error_Handler();
+	}
+
+#ifdef DEBUG
+	printf("Send %c(%x), %d: %c(%x) %x %x %x %x \n",
+			CanTxHeader.StdId, CanTxHeader.StdId, CanTxHeader.DLC,
+			CanTxData[0], CanTxData[0], CanTxData[1], CanTxData[2], CanTxData[3], CanTxData[4]);
+#endif
+}
 
 /* USER CODE END 4 */
 
