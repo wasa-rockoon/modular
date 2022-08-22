@@ -382,11 +382,11 @@ static void MX_CAN_Init(void)
 
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN;
-  hcan.Init.Prescaler = 24;
+  hcan.Init.Prescaler = 8;
   hcan.Init.Mode = CAN_MODE_NORMAL;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan.Init.TimeSeg1 = CAN_BS1_12TQ;
-  hcan.Init.TimeSeg2 = CAN_BS2_3TQ;
+  hcan.Init.TimeSeg1 = CAN_BS1_4TQ;
+  hcan.Init.TimeSeg2 = CAN_BS2_1TQ;
   hcan.Init.TimeTriggeredMode = DISABLE;
   hcan.Init.AutoBusOff = DISABLE;
   hcan.Init.AutoWakeUp = DISABLE;
@@ -398,27 +398,6 @@ static void MX_CAN_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN_Init 2 */
-
-  // Configure Filter
-
-  CAN_FilterTypeDef  fc;
-
-  fc.FilterBank           = 0;
-  fc.FilterMode           = CAN_FILTERMODE_IDMASK;
-  fc.FilterScale          = CAN_FILTERSCALE_32BIT;
-  fc.FilterIdHigh         = 0x0000;
-  fc.FilterIdLow          = 0x0000;
-  fc.FilterMaskIdHigh     = 0x0000;
-  fc.FilterMaskIdLow      = 0x0000;
-  fc.FilterFIFOAssignment = CAN_RX_FIFO0;
-  fc.FilterActivation     = ENABLE;
-  fc.SlaveStartFilterBank = 14;
-
-  if (HAL_CAN_ConfigFilter(&hcan, &fc) != HAL_OK)
-  {
-    /* Filter configuration Error */
-    Error_Handler();
-  }
 
   if (HAL_CAN_Start(&hcan) != HAL_OK)
   {

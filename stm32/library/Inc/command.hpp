@@ -50,6 +50,8 @@ struct Command {
 
 	void setHeader(Entry header);
 	Entry getHeader() const;
+
+	Command& operator=(const Command& command);
 };
 
 
@@ -69,27 +71,46 @@ private:
 	uint8_t count;
 };
 
-
-class HexChannel {
-
-};
-
-class CANChannel {
+class Channel {
 public:
 	Command tx;
 	Command rx;
 
-	bool receive(uint8_t std_id, const uint8_t* data, uint8_t len);
+	Channel();
 
-	uint8_t send(uint8_t& std_id, uint8_t* data, uint8_t& len);
 	void cancelSending();
 
 	bool isReceiving();
 	bool isSending();
 
+protected:
+	int8_t receiving;
+	int8_t sending;
+};
+
+class BinaryChannel: public Channel {
+
+};
+
+class HexChannel: public Channel {
+public:
+	HexChannel();
+
+	bool receive(const uint8_t* data, uint8_t len);
+
+	uint8_t send(uint8_t* data, uint8_t& len);
 private:
-	int8_t receiving = -1;
-	int8_t sending = -1;
+	uint8_t rx_buf[12];
+	uint8_t rx_buf_count;
+};
+
+class CANChannel: public Channel {
+public:
+	CANChannel();
+
+	bool receive(uint8_t std_id, const uint8_t* data, uint8_t len);
+
+	uint8_t send(uint8_t& std_id, uint8_t* data, uint8_t& len);
 };
 
 

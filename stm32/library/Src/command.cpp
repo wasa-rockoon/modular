@@ -36,7 +36,7 @@ void Entry::set(uint8_t type, float value) {
 
 uint8_t Entry::encode(uint8_t* buf) const {
     if (payload.int_ == 0) {
-    	buf[0] = type || 0b10000000;
+    	buf[0] = type | 0b10000000;
     	return 1;
     }
     else {
@@ -63,7 +63,7 @@ uint8_t Entry::encodeHex(uint8_t* buf) const {
     uint8_t len;
 
     if (payload.int_ == 0) {
-        data[0] = type || 0b10000000;
+        data[0] = type | 0b10000000;
         len = 1;
     }
     else {
@@ -89,7 +89,7 @@ uint8_t Entry::encodeHex(uint8_t* buf) const {
 }
 
 uint8_t Entry::decodeHex(const uint8_t* buf) {
-    char *err = nullptr;
+    char *err;
     uint8_t data[5];
     char hex[3];
 
@@ -135,6 +135,67 @@ Entry Command::getHeader() const {
 	return header;
 }
 
+Command& Command::operator=(const Command& command) {
+	id = command.id;
+	to = command.to;
+	from = command.from;
+	size = command.size;
+	for (int n = 0; n < size; n++) {
+		entries[n].type = command.entries[n].type;
+		entries[n].payload = command.entries[n].payload;
+	}
+	return *this;
+}
+
+
+Channel::Channel() {
+	receiving = -1;
+	sending = -1;
+}
+
+void Channel::cancelSending() {
+	sending = -1;
+}
+
+bool Channel::isReceiving() {
+	return receiving != -1;
+}
+
+bool Channel::isSending() {
+	return sending != -1;
+}
+
+HexChannel::HexChannel(): Channel() {
+	rx_buf_count = 0;
+}
+
+uint8_t HexChannel::send(uint8_t* data, uint8_t& len) {
+	if (receiving != -1) {
+		len = 0;
+		return tx.size;
+	}
+	if (sending == -1) {
+		Entry header = tx.getHeader();
+		len = header.encodeHex(data);
+		sending = 0;
+	}
+	else {
+		len = tx.entries[sending].encodeHex(data);
+		sending++;
+	}
+	int remains = tx.size - sending;
+	if (remains == 0) {
+		sending = -1;
+		data[len] = '\n';
+		data[len+1] = '\0';
+		len++;
+	}
+	return remains;
+}
+
+
+
+CANChannel::CANChannel(): Channel() {}
 
 bool CANChannel::receive(uint8_t std_id, const uint8_t* data, uint8_t len) {
 
@@ -182,16 +243,4 @@ uint8_t CANChannel::send(uint8_t& std_id, uint8_t* data, uint8_t& len) {
 	int remains = tx.size - sending;
 	if (remains == 0) sending = -1;
 	return remains;
-}
-
-void CANChannel::cancelSending() {
-	sending = -1;
-}
-
-bool CANChannel::isReceiving() {
-	return receiving != -1;
-}
-
-bool CANChannel::isSending() {
-	return sending != -1;
 }
