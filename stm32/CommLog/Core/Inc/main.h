@@ -60,8 +60,28 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED_Pin GPIO_PIN_1
 #define LED_GPIO_Port GPIOA
+#define LORA_TRX_Pin GPIO_PIN_2
+#define LORA_TRX_GPIO_Port GPIOA
+#define SD_NSW_Pin GPIO_PIN_3
+#define SD_NSW_GPIO_Port GPIOA
+#define SD_SCK_Pin GPIO_PIN_13
+#define SD_SCK_GPIO_Port GPIOB
+#define SD_MISO_Pin GPIO_PIN_14
+#define SD_MISO_GPIO_Port GPIOB
+#define SD_MOSI_Pin GPIO_PIN_15
+#define SD_MOSI_GPIO_Port GPIOB
 #define TWE_NRST_Pin GPIO_PIN_11
 #define TWE_NRST_GPIO_Port GPIOA
+#define LORA_RTX_Pin GPIO_PIN_15
+#define LORA_RTX_GPIO_Port GPIOA
+#define TWE_NSLEEP_Pin GPIO_PIN_3
+#define TWE_NSLEEP_GPIO_Port GPIOB
+#define TWE_NPGM_Pin GPIO_PIN_4
+#define TWE_NPGM_GPIO_Port GPIOB
+#define TWE_TRX_Pin GPIO_PIN_6
+#define TWE_TRX_GPIO_Port GPIOB
+#define TWE_RTX_Pin GPIO_PIN_7
+#define TWE_RTX_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 

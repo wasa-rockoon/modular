@@ -34,11 +34,4 @@
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 		<nature>com.st.stm32cube.ide.mcu.MCUCubeIdeServicesRevAev2ProjectNature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>library</name>
-			<type>2</type>
-			<location>/Users/yuuki.fj/Develop/eagle/Modular/stm32/library</location>
-		</link>
-	</linkedResources>
 </projectDescription>
