@@ -13594,15 +13594,6 @@ The library has been designed by&lt;a href="https://www.facebook.com/groups/eagl
 <wire x1="83.82" y1="66.04" x2="104.14" y2="66.04" width="0.1524" layer="91"/>
 </segment>
 </net>
-<net name="NRST1" class="0">
-<segment>
-<wire x1="0" y1="43.18" x2="-27.94" y2="43.18" width="0.1524" layer="91"/>
-<wire x1="-27.94" y1="43.18" x2="-27.94" y2="106.68" width="0.1524" layer="91"/>
-<pinref part="U$2" gate="G$1" pin="!RESET!"/>
-<wire x1="-27.94" y1="106.68" x2="111.76" y2="106.68" width="0.1524" layer="91"/>
-<wire x1="111.76" y1="106.68" x2="111.76" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
 <net name="DRDYM" class="0">
 <segment>
 <wire x1="83.82" y1="96.52" x2="157.48" y2="96.52" width="0.1524" layer="91"/>
@@ -13828,6 +13819,17 @@ The library has been designed by&lt;a href="https://www.facebook.com/groups/eagl
 <wire x1="129.54" y1="63.5" x2="129.54" y2="48.26" width="0.1524" layer="91"/>
 <pinref part="U$1" gate="G$1" pin="PB1"/>
 <wire x1="129.54" y1="48.26" x2="83.82" y2="48.26" width="0.1524" layer="91"/>
+</segment>
+</net>
+<net name="N$4" class="0">
+<segment>
+<pinref part="U$1" gate="G$1" pin="PG10-NRST"/>
+<wire x1="33.02" y1="40.64" x2="0" y2="40.64" width="0.1524" layer="91"/>
+<wire x1="0" y1="40.64" x2="-27.94" y2="40.64" width="0.1524" layer="91"/>
+<wire x1="-27.94" y1="40.64" x2="-27.94" y2="106.68" width="0.1524" layer="91"/>
+<pinref part="U$2" gate="G$1" pin="!RESET!"/>
+<wire x1="-27.94" y1="106.68" x2="111.76" y2="106.68" width="0.1524" layer="91"/>
+<wire x1="111.76" y1="106.68" x2="111.76" y2="152.4" width="0.1524" layer="91"/>
 </segment>
 </net>
 </nets>
