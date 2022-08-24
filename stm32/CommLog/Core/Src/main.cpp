@@ -36,7 +36,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SEND_TIMEOUT_TICK 40000
+#define CAN_SEND_TIMEOUT_TICK 10
+#define SD_SYNC_TICK 100
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -93,6 +94,9 @@ uint8_t               CanTxData[8];
 uint8_t               CanRxData[8];
 uint32_t              CanTxMailbox;
 
+uint32_t can_last_send_tick = 0;
+uint32_t sd_last_sync_tick = 0;
+
 FATFS fs;  // file system
 FIL fil; // File
 FILINFO fno;
@@ -126,28 +130,17 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 
 		if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
 
-			sd.tx = can.rx;
-
-			uint8_t buf[14];
-			uint8_t len;
-
-			while (true) {
-				int remains = sd.send(buf, len);
-
-				if (len == 0) continue;
-
-				f_puts((char*)buf, &fil);
-
-				if (remains == 0) break;
-			}
+			sd.tx.push(can.rx);
 
 			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		}
 
 #ifdef DEBUG
-		printf("%c(%x), %d: %c(%x) %x %x %x %x \n",
-				CanRxHeader.StdId, CanRxHeader.StdId, CanRxHeader.DLC,
-				CanRxData[0], CanRxData[0], CanRxData[1], CanRxData[2], CanRxData[3], CanRxData[4]);
+//		printf("%c(%x), %d: %c(%x) %x %x %x %x \n",
+//				CanRxHeader.StdId, CanRxHeader.StdId, CanRxHeader.DLC,
+//				CanRxData[0], CanRxData[0], CanRxData[1], CanRxData[2], CanRxData[3], CanRxData[4]);
+//
+		printf("%c\n", CanRxData[0]);
 #endif
 	}
 }
@@ -222,7 +215,7 @@ int main(void)
 
   fresult = f_open(&fil, "lists.txt", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
   uint32_t file_id = f_size(&fil);
-  for (unsigned n = 0; n < file_id; n++) f_putc('1', &fil);
+  for (unsigned n = 0; n <= file_id; n++) f_putc('1', &fil);
   fresult = f_close(&fil);
 
   char file_name[16];
@@ -247,41 +240,34 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_Delay(1000);
 
-	  if (file_opened) f_sync(&fil);
+	  if (sd.isSending()) {
+		  uint8_t buf[14];
+		  uint8_t len;
 
-	  // HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-//
-//	  uint8_t* rx;
-//	  unsigned len = UART_Read(&rx);
-//
-//	  Command *command = readHex(&twe_channel, rx, len);
-//
-//#ifdef DEBUG
-//	  if (len > 0) {
-//		  //printf("uart %.*s (%d)\n", len, rx, len);
-//	  }
-//	  if (command) {
-//		  printCommand(command);
-//	  }
-//#endif
-//	  if (command) {
-//		  while (true) {
-//			  uint8_t tx[8];
-//			  int remains = writeCAN(&can_channel, command, tx);
-//			  CAN_Send(tx, 8);
-//
-//			  //HAL_Delay(10);
-//
-//			  if (remains == 0) break;
-//		  }
-//		  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-//	  }
+		  while (true) {
+			  int remains = sd.send(buf, len);
 
-//	  CAN_Send((uint8_t*)"AAA", 3);
-//	  HAL_Delay(1000);
-	  //printf("%ld %s %ld\n", CanRxHeader.IDE, CanRxData, CanRxHeader.DLC);
+			  if (len == 0) continue;
+
+			  f_puts((char*)buf, &fil);
+
+			  if (remains == 0) break;
+		  }
+	  }
+
+	  if (file_opened && HAL_GetTick() - sd_last_sync_tick >= SD_SYNC_TICK){
+		  f_sync(&fil);
+		  sd_last_sync_tick = HAL_GetTick();
+	  }
+
+	  if (can.isSending() &&
+			  HAL_GetTick() - can_last_send_tick >= CAN_SEND_TIMEOUT_TICK) {
+		  can.cancelSending();
+#ifdef DEBUG
+		  printf("TIMEOUT\n");
+#endif
+	  }
 
     /* USER CODE END WHILE */
 
@@ -352,11 +338,11 @@ static void MX_CAN_Init(void)
 
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN;
-  hcan.Init.Prescaler = 8;
+  hcan.Init.Prescaler = 24;
   hcan.Init.Mode = CAN_MODE_NORMAL;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan.Init.TimeSeg1 = CAN_BS1_4TQ;
-  hcan.Init.TimeSeg2 = CAN_BS2_1TQ;
+  hcan.Init.TimeSeg1 = CAN_BS1_12TQ;
+  hcan.Init.TimeSeg2 = CAN_BS2_3TQ;
   hcan.Init.TimeTriggeredMode = DISABLE;
   hcan.Init.AutoBusOff = DISABLE;
   hcan.Init.AutoWakeUp = DISABLE;
@@ -391,7 +377,7 @@ static void MX_CAN_Init(void)
     Error_Handler();
   }
 
-  if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
+  if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING | CAN_IT_TX_MAILBOX_EMPTY) != HAL_OK)
   {
     /* Notification Error */
     Error_Handler();
@@ -621,79 +607,50 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
+{
+	can_last_send_tick = HAL_GetTick();
+	if (can.isSending()) CAN_Send();
+}
+void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan)
+{
+	can_last_send_tick = HAL_GetTick();
+	if (can.isSending()) CAN_Send();
+}
+void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan)
+{
+	can_last_send_tick = HAL_GetTick();
+	if (can.isSending()) CAN_Send();
+}
+
 void CAN_Send() {
 	uint8_t std_id, len;
 
-	while (can.isReceiving() || can.isSending());
+	while (can.isReceiving());
 
-	while (true) {
-		int remains = can.send(std_id, CanTxData, len);
+	can.send(std_id, CanTxData, len);
 
-		if (len == 0) continue;
-		CanTxHeader.StdId = std_id;
-		CanTxHeader.DLC = len;
+	if (len == 0) return;
 
-		int tick = 0;
-		while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) != 3) {
-			if (tick > SEND_TIMEOUT_TICK) {
-				can.cancelSending();
-				return;
-			}
-			tick++;
-		}
-		if (HAL_CAN_AddTxMessage(&hcan, &CanTxHeader, CanTxData, &CanTxMailbox) != HAL_OK) {
-			Error_Handler();
-		}
+	CanTxHeader.StdId = std_id;
+	CanTxHeader.DLC = len;
 
-		if (remains == 0) break;
+	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) != 3);
+
+	volatile unsigned tick = 0;
+	while (tick < 24000) tick++;
+
+	if (HAL_CAN_AddTxMessage(&hcan, &CanTxHeader, CanTxData, &CanTxMailbox) != HAL_OK) {
+		Error_Handler();
 	}
+
+#ifdef DEBUG
+	printf("Send %c(%x), %d: %c(%x) %x %x %x %x \n",
+			CanTxHeader.StdId, CanTxHeader.StdId, CanTxHeader.DLC,
+			CanTxData[0], CanTxData[0], CanTxData[1], CanTxData[2], CanTxData[3], CanTxData[4]);
+#endif
 }
 
-
-//
-//void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle){
-////	printf("I");
-//	if(UartHandle->Instance == USART1){
-//		printf("%s", rxbuf);
-////		__HAL_UART_SEND_REQ(&huart1, UART_RXDATA_FLUSH_REQUEST);
-////		HAL_UART_Receive_IT(&huart1, rxbuf, RXSIZE);
-//		HAL_UART_Receive_DMA(&huart1, rxbuf, RXSIZE);
-//	}
-//}
-//
-//void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle) {
-////	HAL_UART_Abort(&huart1);
-//	printf("Error\n");
-////	HAL_UART_Receive_IT(&huart1, rxbuf, RXSIZE);
-////	HAL_UART_Receive_DMA(&huart1, rxbuf, RXSIZE);
-//}
-//
-//int TWE_ECHO() {
-//	HAL_UART_Receive(&huart1,(uint8_t *)rxbuf, sizeof(rxbuf), 0xF);
-//	if (rxbuf[0] != 0) {
-//		printf("%s", rxbuf);
-//		TWE_Transmit(rxbuf);
-//		rxbuf[0] = 0;
-//		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-//		return 1;
-//	}
-//	else return 0;
-//}
-//
-//int TWE_Receive_and_Print() {
-//	HAL_UART_Receive(&huart1,(uint8_t *)rxbuf, sizeof(rxbuf), 0xF);
-//	if (rxbuf[0] != 0) {
-//		printf("%s\n", rxbuf);
-//		rxbuf[0] = 0;
-//		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-//		return 1;
-//	}
-//	else return 0;
-//}
-//
-//void TWE_Transmit(char* str) {
-//	HAL_UART_Transmit(&huart1,(uint8_t *)str, sizeof(str), 0xFFFF);
-//}
 
 /* USER CODE END 4 */
 
