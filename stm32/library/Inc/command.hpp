@@ -13,8 +13,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define NUM_STREAMS 4
-#define MAX_ENTRIES 16
+
+#define MAX_ENTRIES 12
 
 #define BIN_TX_QUEUE_SIZE 4
 #define HEX_TX_QUEUE_SIZE 4
@@ -153,9 +153,9 @@ class CANChannel: public Channel<CAN_TX_QUEUE_SIZE> {
 public:
 	CANChannel();
 
-	bool receive(uint8_t std_id, const uint8_t* data, uint8_t len);
+	bool receive(uint16_t std_id, const uint8_t* data, uint8_t len);
 
-	uint8_t send(uint8_t& std_id, uint8_t* data, uint8_t& len);
+	uint8_t send(uint16_t& std_id, uint8_t* data, uint8_t& len);
 };
 
 

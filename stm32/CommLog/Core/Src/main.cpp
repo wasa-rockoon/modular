@@ -36,8 +36,27 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+
+#define LAUNCHER
+
+#ifndef LAUNCHER
+#define GS
+#endif
+
 #define CAN_SEND_TIMEOUT_TICK 10
 #define SD_SYNC_TICK 100
+
+const uint8_t PANID[] = "0110";
+
+#ifdef LAUNCHER
+const uint8_t DEST_ADDR[] = "0002";
+#endif
+#ifdef GS
+const uint8_t DEST_ADDR[] = "0000";
+#endif
+
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -59,6 +78,8 @@ DMA_HandleTypeDef hdma_usart1_tx;
 DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
+TIM_HandleTypeDef htim14;
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -72,6 +93,7 @@ static void MX_CAN_Init(void);
 static void MX_IWDG_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM14_Init(void);
 /* USER CODE BEGIN PFP */
 
 extern "C" void initialise_monitor_handles(void);
@@ -104,6 +126,11 @@ FRESULT fresult;  // result
 UINT br, bw;  // File read/write count
 
 bool file_opened = false;
+bool lora_initialized = false;
+
+uint32_t count = 0;
+
+bool lora_sending = false;
 
 
 void TWE_Init() {
@@ -115,33 +142,134 @@ void TWE_Init() {
 
 void LoRa_Init() {
 
+	HAL_Delay(100);
+
+	HAL_GPIO_WritePin(LORA_NRST_GPIO_Port, LORA_NRST_Pin, GPIO_PIN_RESET);
+	HAL_Delay(100);
+	HAL_GPIO_WritePin(LORA_NRST_GPIO_Port, LORA_NRST_Pin, GPIO_PIN_SET);
+
+	HAL_Delay(2000);
+
+	uint8_t* buf;
+	uint32_t len = lora.read(buf);
+
+	if (len > 0) {
+#ifdef DEBUG
+		printf("LoRa: %.*s\n", len, buf);
+#endif
+	}
+
+	HAL_UART_Receive_DMA(&huart2, lora.rx_buf(), RXBUFSIZE);
+
+	uint8_t com_p[] = "2\x0d\x0a";
+	HAL_UART_Transmit_DMA(&huart2, com_p, 3);
+
+	HAL_Delay(100);
+
+	uint8_t com_s[] = "z\x0d\x0a";
+	HAL_UART_Transmit_DMA(&huart2, com_s, 3);
+
+	HAL_Delay(100);
+	len = lora.read(buf);
+
+	if (len > 0) {
+#ifdef DEBUG
+		printf("LoRa: %.*s\n", len, buf);
+#endif
+	}
+
+	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+
+	HAL_UART_Receive_DMA(&huart2, lora.rx_buf(), RXBUFSIZE);
+
+	lora_initialized = true;
+}
+
+
+void LoRa_SendFrame(uint8_t* data, uint8_t len) {
+#ifdef DEBUG
+		printf("Send %s\n", data);
+#endif
+
+	lora_sending = true;
+
+	uint8_t header[59];
+	header[0] = len + 8;
+	for (int i = 0; i < 4; i++) header[i + 1] = PANID[i];
+	for (int i = 0; i < 4; i++) header[i + 5] = DEST_ADDR[i];
+	for (int i = 0; i < len; i++) header[i + 9] = data[i];
+//	*(uint32_t*)(header + 1) = PANID;
+//	*(uint32_t*)(header + 5) = DEST_ADDR;
+	HAL_UART_Transmit_DMA(&huart2, header, 9 + len);
+//	HAL_UART_Transmit_DMA(&huart2, data, len);
+}
+
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim == &htim14) {
+#ifndef DEBUG
+    	HAL_IWDG_Refresh(&hiwdg);
+#endif
+    }
 }
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
-	while (HAL_CAN_GetRxFifoFillLevel(hcan, CAN_RX_FIFO0) > 0) {
-		/* Get RX message */
-		if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &CanRxHeader, CanRxData) != HAL_OK) {
-		    /* Reception Error */
-		    Error_Handler();
-		}
+	/* Get RX message */
+	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &CanRxHeader, CanRxData) != HAL_OK) {
+		/* Reception Error */
+		Error_Handler();
+	}
 
-		if (!file_opened) return;
+	count++;
 
-		if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
+//	__HAL_UNLOCK(hcan);
 
-			sd.tx.push(can.rx);
-
-			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-		}
-
-#ifdef DEBUG
-//		printf("%c(%x), %d: %c(%x) %x %x %x %x \n",
-//				CanRxHeader.StdId, CanRxHeader.StdId, CanRxHeader.DLC,
-//				CanRxData[0], CanRxData[0], CanRxData[1], CanRxData[2], CanRxData[3], CanRxData[4]);
+//#ifdef DEBUG
+////		printf("%c(%x), %d: %c(%x) %x %x %x %x \n",
+////				CanRxHeader.StdId, CanRxHeader.StdId, CanRxHeader.DLC,
+////				CanRxData[0], CanRxData[0], CanRxData[1], CanRxData[2], CanRxData[3], CanRxData[4]);
 //
-		printf("%c\n", CanRxData[0]);
-#endif
+//	printf("%c\n", CanRxData[0]);
+//#endif
+//
+	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
+
+		if (file_opened) sd.tx.push(can.rx);
+
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+
+		count++;
+
+		if (lora_initialized && !lora_sending && count % 20 == 0) {
+			uint8_t buf[] = "ABC";
+			LoRa_SendFrame(buf, 3);
+		}
+	}
+}
+void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
+{
+	/* Get RX message */
+	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO1, &CanRxHeader, CanRxData) != HAL_OK) {
+		/* Reception Error */
+		Error_Handler();
+	}
+
+	count++;
+
+	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
+
+		if (file_opened) sd.tx.push(can.rx);
+
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+
+		count++;
+
+		if (lora_initialized  && !lora_sending && count % 20 == 0) {
+			uint8_t buf[] = "CDE";
+			LoRa_SendFrame(buf, 3);
+		}
 	}
 }
 
@@ -187,7 +315,10 @@ int main(void)
   MX_SPI2_Init();
   MX_FATFS_Init();
   MX_USART2_UART_Init();
+  MX_TIM14_Init();
   /* USER CODE BEGIN 2 */
+
+  HAL_TIM_Base_Start_IT(&htim14);
 
 
 #ifdef DEBUG
@@ -196,10 +327,6 @@ int main(void)
 
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
-  TWE_Init();
-
-  LoRa_Init();
-
 
   fresult = f_mount(&fs, "/", 1);
 
@@ -207,11 +334,6 @@ int main(void)
   FATFS *pfs;
   DWORD fre_clust;
   f_getfree("", &fre_clust, &pfs);
-
-  uint32_t total = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
-  uint32_t free_space = (uint32_t)(fre_clust * pfs->csize * 0.5);
-
-
 
   fresult = f_open(&fil, "lists.txt", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
   uint32_t file_id = f_size(&fil);
@@ -227,9 +349,18 @@ int main(void)
   if (fresult == FR_OK) file_opened = true;
 
 #ifdef DEBUG
-  printf("File opened: %s, total: %d, free: %d, %d\n",
-		  file_name, total, free_space, fresult);
+//  uint32_t total = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
+//  uint32_t free_space = (uint32_t)(fre_clust * pfs->csize * 0.5);
+//
+//  printf("File opened: %s, total: %d, free: %d, %d\n",
+//		  file_name, total, free_space, fresult);
+  printf("File opened: %s, %d\n", file_name, fresult);
 #endif
+
+
+  TWE_Init();
+
+  LoRa_Init();
 
 
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
@@ -240,6 +371,20 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+//	  printf("%d %d %d\n", count0, count1, count0 + count1);
+
+	  uint8_t* buf;
+	  uint32_t len = lora.read(buf);
+
+	  if (len > 0) {
+#ifdef DEBUG
+		  printf("LoRa: %.*s\n", len, buf);
+#endif
+		  lora_sending = false;
+
+//		  HAL_UART_Receive_DMA(&huart2, lora.rx_buf(), RXBUFSIZE);
+	  }
+
 
 	  if (sd.isSending()) {
 		  uint8_t buf[14];
@@ -346,8 +491,8 @@ static void MX_CAN_Init(void)
   hcan.Init.TimeTriggeredMode = DISABLE;
   hcan.Init.AutoBusOff = DISABLE;
   hcan.Init.AutoWakeUp = DISABLE;
-  hcan.Init.AutoRetransmission = DISABLE;
-  hcan.Init.ReceiveFifoLocked = DISABLE;
+  hcan.Init.AutoRetransmission = ENABLE;
+  hcan.Init.ReceiveFifoLocked = ENABLE;
   hcan.Init.TransmitFifoPriority = DISABLE;
   if (HAL_CAN_Init(&hcan) != HAL_OK)
   {
@@ -355,18 +500,36 @@ static void MX_CAN_Init(void)
   }
   /* USER CODE BEGIN CAN_Init 2 */
 
-  CAN_FilterTypeDef filter;
-  filter.FilterIdHigh         = 0;
-  filter.FilterIdLow          = 0;
-  filter.FilterMaskIdHigh     = 0;
-  filter.FilterMaskIdLow      = 0;
-  filter.FilterScale          = CAN_FILTERSCALE_32BIT;
-  filter.FilterFIFOAssignment = CAN_FILTER_FIFO0;
-  filter.FilterBank           = 0;
-  filter.FilterMode           = CAN_FILTERMODE_IDMASK;
-  filter.SlaveStartFilterBank = 14;
-  filter.FilterActivation     = ENABLE;
-  if (HAL_CAN_ConfigFilter(&hcan, &filter) != HAL_OK)
+  CAN_FilterTypeDef filter0;
+  uint32_t fId0   =  0x000 << 21;
+  uint32_t fMask0 = (0x100 << 21) | 0x4;
+  filter0.FilterIdHigh         = fId0 >> 16;
+  filter0.FilterIdLow          = fId0;
+  filter0.FilterMaskIdHigh     = fMask0 >> 16;
+  filter0.FilterMaskIdLow      = fMask0;
+  filter0.FilterScale          = CAN_FILTERSCALE_32BIT;
+  filter0.FilterFIFOAssignment = CAN_FILTER_FIFO0;
+  filter0.FilterBank           = 0;
+  filter0.FilterMode           = CAN_FILTERMODE_IDMASK;
+  filter0.FilterActivation     = ENABLE;
+  if (HAL_CAN_ConfigFilter(&hcan, &filter0) != HAL_OK)
+  {
+	Error_Handler();
+  }
+
+  CAN_FilterTypeDef filter1;
+  uint32_t fId1   =  0x100 << 21;
+  uint32_t fMask1 = (0x100 << 21) | 0x4;
+  filter1.FilterIdHigh         = fId1 >> 16;
+  filter1.FilterIdLow          = fId1;
+  filter1.FilterMaskIdHigh     = fMask1 >> 16;
+  filter1.FilterMaskIdLow      = fMask1;
+  filter1.FilterScale          = CAN_FILTERSCALE_32BIT;
+  filter1.FilterFIFOAssignment = CAN_FILTER_FIFO1;
+  filter1.FilterBank           = 2;
+  filter1.FilterMode           = CAN_FILTERMODE_IDMASK;
+  filter1.FilterActivation     = ENABLE;
+  if (HAL_CAN_ConfigFilter(&hcan, &filter1) != HAL_OK)
   {
 	Error_Handler();
   }
@@ -377,7 +540,7 @@ static void MX_CAN_Init(void)
     Error_Handler();
   }
 
-  if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING | CAN_IT_TX_MAILBOX_EMPTY) != HAL_OK)
+  if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING | CAN_IT_RX_FIFO1_MSG_PENDING | CAN_IT_TX_MAILBOX_EMPTY) != HAL_OK)
   {
     /* Notification Error */
     Error_Handler();
@@ -467,6 +630,38 @@ static void MX_SPI2_Init(void)
 }
 
 /**
+  * @brief TIM14 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM14_Init(void)
+{
+
+  /* USER CODE BEGIN TIM14_Init 0 */
+
+  /* USER CODE END TIM14_Init 0 */
+
+  /* USER CODE BEGIN TIM14_Init 1 */
+
+  /* USER CODE END TIM14_Init 1 */
+  htim14.Instance = TIM14;
+  htim14.Init.Prescaler = 48000;
+  htim14.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim14.Init.Period = 1000;
+  htim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim14) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM14_Init 2 */
+//  htim14.Init.Period = 1000 / SAMPLE_FREQ;
+  /* USER CODE END TIM14_Init 2 */
+
+}
+
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -521,7 +716,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 38400;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -571,38 +766,58 @@ static void MX_DMA_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
+	/* GPIO Ports Clock Enable */
+	__HAL_RCC_GPIOC_CLK_ENABLE();
+	__HAL_RCC_GPIOA_CLK_ENABLE();
+	__HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LED_Pin|TWE_NRST_Pin, GPIO_PIN_RESET);
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(LORA_NRST_GPIO_Port, LORA_NRST_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, TWE_NSLEEP_Pin|TWE_NPGM_Pin, GPIO_PIN_SET);
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : LED_Pin TWE_NRST_Pin */
-  GPIO_InitStruct.Pin = LED_Pin|TWE_NRST_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(GPIOA, LORA_NSLEEP_Pin|TWE_NRST_Pin, GPIO_PIN_SET);
 
-  /*Configure GPIO pin : SD_NSW_Pin */
-  GPIO_InitStruct.Pin = SD_NSW_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(SD_NSW_GPIO_Port, &GPIO_InitStruct);
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(GPIOB, TWE_NSLEEP_Pin|TWE_NPGM_Pin, GPIO_PIN_SET);
 
-  /*Configure GPIO pins : TWE_NSLEEP_Pin TWE_NPGM_Pin */
-  GPIO_InitStruct.Pin = TWE_NSLEEP_Pin|TWE_NPGM_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	/*Configure GPIO pin : LORA_NRST_Pin */
+	GPIO_InitStruct.Pin = LORA_NRST_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(LORA_NRST_GPIO_Port, &GPIO_InitStruct);
 
+	/*Configure GPIO pin : LED_Pin */
+	GPIO_InitStruct.Pin = LED_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+
+	/*Configure GPIO pin : SD_NSW_Pin */
+	GPIO_InitStruct.Pin = SD_NSW_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	HAL_GPIO_Init(SD_NSW_GPIO_Port, &GPIO_InitStruct);
+
+	/*Configure GPIO pins : LORA_NSLEEP_Pin TWE_NRST_Pin */
+	GPIO_InitStruct.Pin = LORA_NSLEEP_Pin|TWE_NRST_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+	  /*Configure GPIO pins : TWE_NSLEEP_Pin TWE_NPGM_Pin */
+	GPIO_InitStruct.Pin = TWE_NSLEEP_Pin|TWE_NPGM_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 }
 
 /* USER CODE BEGIN 4 */
@@ -624,7 +839,8 @@ void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan)
 }
 
 void CAN_Send() {
-	uint8_t std_id, len;
+	uint16_t std_id;
+	uint8_t len;
 
 	while (can.isReceiving());
 
@@ -637,18 +853,15 @@ void CAN_Send() {
 
 	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) != 3);
 
-	volatile unsigned tick = 0;
-	while (tick < 24000) tick++;
-
 	if (HAL_CAN_AddTxMessage(&hcan, &CanTxHeader, CanTxData, &CanTxMailbox) != HAL_OK) {
 		Error_Handler();
 	}
-
-#ifdef DEBUG
-	printf("Send %c(%x), %d: %c(%x) %x %x %x %x \n",
-			CanTxHeader.StdId, CanTxHeader.StdId, CanTxHeader.DLC,
-			CanTxData[0], CanTxData[0], CanTxData[1], CanTxData[2], CanTxData[3], CanTxData[4]);
-#endif
+//
+//#ifdef DEBUG
+//	printf("Send %c(%x), %d: %c(%x) %x %x %x %x \n",
+//			CanTxHeader.StdId, CanTxHeader.StdId, CanTxHeader.DLC,
+//			CanTxData[0], CanTxData[0], CanTxData[1], CanTxData[2], CanTxData[3], CanTxData[4]);
+//#endif
 }
 
 
@@ -662,7 +875,10 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-
+	__disable_irq();
+	while (1)
+	{
+	}
   /* USER CODE END Error_Handler_Debug */
 }
 

@@ -58,6 +58,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LORA_NRST_Pin GPIO_PIN_13
+#define LORA_NRST_GPIO_Port GPIOC
 #define LED_Pin GPIO_PIN_1
 #define LED_GPIO_Port GPIOA
 #define LORA_TRX_Pin GPIO_PIN_2
@@ -70,6 +72,8 @@ void Error_Handler(void);
 #define SD_MISO_GPIO_Port GPIOB
 #define SD_MOSI_Pin GPIO_PIN_15
 #define SD_MOSI_GPIO_Port GPIOB
+#define LORA_NSLEEP_Pin GPIO_PIN_8
+#define LORA_NSLEEP_GPIO_Port GPIOA
 #define TWE_NRST_Pin GPIO_PIN_11
 #define TWE_NRST_GPIO_Port GPIOA
 #define LORA_RTX_Pin GPIO_PIN_15

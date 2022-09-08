@@ -101,7 +101,7 @@ uint8_t Entry::decodeHex(const uint8_t* buf) {
 
     type = data[0] & 0b01111111;
 
-    if (buf[0] & 0b1000000) {
+    if (data[0] & 0b1000000) {
     	return 2;
     	payload.int_ = 0;
     }
@@ -245,10 +245,12 @@ uint8_t HexChannel::send(uint8_t* data, uint8_t& len) {
 
 CANChannel::CANChannel(): Channel() {}
 
-bool CANChannel::receive(uint8_t std_id, const uint8_t* data, uint8_t len) {
+bool CANChannel::receive(uint16_t std_id, const uint8_t* data, uint8_t len) {
 
 	Entry entry;
 	if (!entry.decode(data, len)) return false;
+
+	std_id &= 0x0ff;
 
 	// Start receiving_ new command
 	if (entry.type == 0) {
@@ -273,13 +275,15 @@ bool CANChannel::receive(uint8_t std_id, const uint8_t* data, uint8_t len) {
 	else return false;
 }
 
-uint8_t CANChannel::send(uint8_t& std_id, uint8_t* data, uint8_t& len) {
+uint8_t CANChannel::send(uint16_t& std_id, uint8_t* data, uint8_t& len) {
 	if (receiving_ != -1 || tx.size() == 0) {
 		len = 0;
 		return tx.size();
 	}
 
 	std_id = tx.first().id;
+
+	if (((sending_ + 1) / 3) % 2 == 1) std_id |= 0x100;
 
 	if (sending_ == -1) {
 		Entry header = tx.first().getHeader();
