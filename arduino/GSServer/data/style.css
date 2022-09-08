@@ -1,0 +1,21 @@
+body {
+    background: #121212;
+    color: white;
+}
+
+.command.updated {
+    animation: update 0.5s ease-out both;
+}
+
+@keyframes update {
+    0% {
+        background: #558b2f;
+    }
+    100% {
+        background: transparent;
+    }
+}
+
+.error {
+    background: #d32f2f;
+}
