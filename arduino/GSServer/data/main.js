@@ -28,6 +28,18 @@ const command_format = {
       'T': { name: 'Time',      unit: 's', datatype: 'time' },
     }
   },
+  'S': {
+    name: 'LoRa TX',
+    entries: {
+      'C': { name: 'Code', unit: '', datatype: 'int' },
+    }
+  },
+  'R': {
+    name: 'LoRa RX',
+    entries: {
+      'R': { name: 'RSSI', unit: 'dBm', datatype: 'int' },
+    }
+  },
   'Sample': {
     name: 'Sample',
     entries: {
@@ -55,7 +67,7 @@ function main() {
     sample.entries.push(entry)
   }
   console.log(sample);
-  gs_packets['Sample'] = sample;
+  // gs_packets['Sample'] = sample;
 
   render();
 }
@@ -204,6 +216,9 @@ function parseCommandHex(line) {
         switch (format.entries[type].datatype) {
         case 'float':
           entry.payload = view.getFloat32(0);
+          break;
+        case 'int':
+          entry.payload = view.getInt32(0);
           break;
         case 'time':
           entry.payload = new Date(view.getUint32(0) * 1000);

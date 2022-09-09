@@ -198,7 +198,7 @@ void request_data(AsyncWebServerRequest *request) {
   if (p == NULL) index = 0;
   else index = p->value().toInt();
 
-  if (index < 0) index = max(0, (int)received_count - 1);
+  if (index < 0) index = max(0, (int)received_count - 200);
   else if (index >= received_count_max) index = 0;
 
   String response;
