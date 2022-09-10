@@ -1,13 +1,12 @@
 #include <TinyGPS++.h>
-#include <Wire.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
-#include <ArduinoJson.h>
-#include <ESPAsyncWebServer.h>
+#include <WebServer.h>
 #include <AsyncJson.h>
 #include <SPIFFS.h>
 #include <CAN.h>
 #include "command.hpp"
+#include "LCD.h"
 
 #define AP_MODE
 
@@ -15,54 +14,76 @@
 #define GPS_TX_PIN 18
 #define CAN_RX_PIN 32
 #define CAN_TX_PIN 33
+#define LED_PIN 2
 
 #define CAN_BAUD 125000
 static const uint32_t GPSBaud = 9600;
 
-#define RETURN_COMMAND_MAX 10
+#define RETURN_COMMAND_MAX 1000
+
+#define BLINK_MS 50
 
 const char ssid[] = "Rockoon-GS";
 const char pass[] = "rockoon-gs";
 const IPAddress ip(192,168,1,1);
 const IPAddress subnet(255,255,255,0);
-AsyncWebServer server(80);
+WebServer server(80);
 
 CANChannel can_channel;
 HexChannel hex_channel;
 StaticJsonDocument<512> json;
 
-Command* received_commands;
-uint32_t received_count;
-uint32_t received_count_max;
+Command* received_tlm_commands;
+uint32_t received_tlm_count;
+uint32_t received_tlm_max;
 
-#define LCD_ADRS 0x3E
-char bLng[] ="Lng=";
-char bLat[] ="Lat= ";
-char aLng[12];
-char aLat[11];
+Command* received_gs_commands;
+uint32_t received_gs_count;
+uint32_t received_gs_max;
+
+
+LCD lcd;
 TinyGPSPlus gps;
 HardwareSerial ss(2);
+
+unsigned long blink_ms;
+
 
 void setup() {
   Serial.begin(115200);
   ss.begin(GPSBaud, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
-
-  pinMode(21, INPUT_PULLUP);
-  pinMode(22, INPUT_PULLUP);
   Wire.begin(21, 22);
-  /* Wire.setClock(10000); */
+
+  /* pinMode(21, INPUT_PULLUP); */
+  /* pinMode(22, INPUT_PULLUP); */
+
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, HIGH);
 
   i2c_scanner();
 
+  lcd.begin();
+
   init_datastore();
+
+  delay(1000);
+
   init_server();
-  init_LCD();
 
   delay(1000);
 
   CAN.setPins(CAN_RX_PIN, CAN_TX_PIN);
   CAN.begin(CAN_BAUD * 2);
   CAN.onReceive(onCANReceive);
+
+  digitalWrite(LED_PIN, LOW);
+
+  char line1[] = "GPS Unavailable ";
+  char line2[] = "----------------";
+
+  strncpy(lcd.line1, line1, 16);
+  strncpy(lcd.line2, line2, 16);
+  lcd.show();
 }
 
 void loop() {
@@ -74,14 +95,10 @@ void loop() {
     gps.encode(c);
   }
 
+
   // Update location
   if (!gps.location.isValid()) {
-    char msg[] = "GPS Unavailable";
-    writeCommand(0x80);
-    for(int i = 0; i < sizeof(msg); i++) {
-      writeData(msg[i]);
-    }
-    delay(10);
+
   }
   else if (gps.location.isUpdated()) {
     struct tm t;
@@ -94,43 +111,40 @@ void loop() {
     t.tm_isdst = -1;
     time_t epoch = mktime(&t);
 
-    Command position('P', 0, 0, 4);
+    Command position('P', 0, 0, 5);
     position.entries[0].set('O', (float)gps.location.lng());
     position.entries[1].set('A', (float)gps.location.lat());
     position.entries[2].set('H', (float)gps.altitude.meters());
     position.entries[3].set('T', (uint32_t)(epoch));
+    position.entries[4].set('t', (uint32_t)(millis()));
 
     can_channel.tx.push(position);
     sendCAN();
 
-    addReceivedCommand(position);
+    addReceivedGSCommand(position);
 
-    snprintf(aLng,12,"%.8f",gps.location.lng());
-    snprintf(aLat,11,"%.8f",gps.location.lat());
-
-    writeCommand(0x80);
-    for(int i = 0; i < 4; i++) {
-      writeData(bLng[i]);
-    }
-    for(int i = 0; i < 12; i++) {
-      writeData(aLng[i]);
-    }
-    writeCommand(0x40+0x80); // 2LINE TOP
-    for(int i = 0; i < 5; i++) {
-      writeData(bLat[i]);
-    }
-    for(int i = 0; i < 11; i++) {
-      writeData(aLat[i]);
-    }
+    strcpy(lcd.line1, "G Lng=");
+    strcpy(lcd.line2, "G Lat= ");
+    snprintf(lcd.line1 + 6, 11, "%3.7f", gps.location.lng());
+    snprintf(lcd.line2 + 7, 10, "%2.7f", gps.location.lat());
+    lcd.show();
   }
 
+  lcd.update();
 
-  Serial.print("data: ");
-  Serial.println(received_count);
+  server.handleClient();
 
-  delay(50);
+  /* Serial.print("data: "); */
+  /* Serial.println(received_count); */
+
+  /* delay(50); */
 
   /* addDummyCANData(); */
+
+  if (millis() - blink_ms >= BLINK_MS) {
+    digitalWrite(LED_PIN, LOW);
+  }
+
 }
 
 
@@ -153,15 +167,15 @@ void onCANReceive(int packetSize) {
   }
 
   if (can_channel.receive(id, data, len)) {
-    addReceivedCommand(can_channel.rx);
+    can_channel.rx.entries[can_channel.rx.size].set('t', (uint32_t)(millis()));
+    can_channel.rx.size += 1;
+    addReceivedTlmCommand(can_channel.rx);
   }
 }
 
 
 void sendCAN() {
 	while (true) {
-
-
 		if (can_channel.isReceiving()) return;
 
 		uint16_t std_id;
@@ -180,37 +194,45 @@ void sendCAN() {
 	}
 }
 
-void addReceivedCommand(Command &command) {
-  /* Serial.print("data: "); */
-  /* Serial.println(received_count); */
+void addReceivedTlmCommand(Command &command) {
+  Serial.print("tlm: ");
+  Serial.println(received_tlm_count);
+  blink();
 
-  received_commands[received_count] = command;
-  received_count++;
-  if (received_count >= received_count_max) {
-    received_count = 0;
-  }
+  received_tlm_commands[received_tlm_count % received_tlm_max] = command;
+  received_tlm_count++;
+}
+void addReceivedGSCommand(Command &command) {
+  Serial.print("tlm: ");
+  Serial.println(received_gs_count);
+  blink();
+
+  received_gs_commands[received_gs_count % received_gs_max] = command;
+  received_gs_count++;
 }
 
-void request_data(AsyncWebServerRequest *request) {
-  AsyncWebParameter *p = request->getParam("index");
-  int index;
+void handleDataRequest(bool gs = false) {
+  int request_index = 0;
 
-  if (p == NULL) index = 0;
-  else index = p->value().toInt();
+  for (int i = 0; i < server.args(); i++) {
+    if (server.argName(i) == "index") {
+      request_index = server.arg(i).toInt();
+    }
+  }
 
-  if (index < 0) index = max(0, (int)received_count - 200);
-  else if (index >= received_count_max) index = 0;
+  if (request_index < 0) request_index = 0;
+
+  int index_from = request_index % (gs ? received_gs_max : received_tlm_max);
 
   String response;
 
-  for (int n = 0; n < RETURN_COMMAND_MAX; n++) {
-    if (index == received_count_max) {
-      index = 0;
-      break;
-    }
-    if (index == received_count) break;
+  int index = index_from;
 
-    hex_channel.tx.push(received_commands[index]);
+  for (int n = 0; n < RETURN_COMMAND_MAX; n++) {
+    if (index == (gs ? received_gs_count : received_tlm_count)) break;
+
+    hex_channel.tx.push
+      ((gs ? received_gs_commands : received_tlm_commands)[index]);
 
     uint8_t buf[12];
     uint8_t len;
@@ -219,49 +241,18 @@ void request_data(AsyncWebServerRequest *request) {
       response += String((char*)buf);
       if (remains <= 0) break;
     }
+
     index++;
+    if (index == (gs ? received_gs_max : received_tlm_max)) index = 0;
   }
 
-  request->send(200, "text/plain", response);
+  log_d("requested tlm data: %d, return %d to %d",
+        request_index, index_from, index);
+
+  server.send(200, "text/plain", response);
 }
 
-bool init_datastore() {
-  psramInit();
-  log_d("Total heap: %d", ESP.getHeapSize());
-  log_d("Free heap: %d", ESP.getFreeHeap());
-  log_d("Total PSRAM: %d", ESP.getPsramSize());
-  log_d("Free PSRAM: %d", ESP.getFreePsram());
 
-  int mem_size = ESP.getFreePsram() / 2;
-
-  received_commands = (Command*)ps_malloc(mem_size);
-  received_count_max = mem_size / sizeof(Command);
-  received_count = 0;
-
-  if (received_commands == NULL) {
-    Serial.println("Failed to alloc memory");
-    return false;
-  }
-
-  Serial.print("Allocated ");
-  Serial.println(received_count_max);
-
-  /* int entries_average = 8; */
-  /* int entries_bytes = sizeof(Entry); */
-  /* int command_bytes = entries_bytes * (entries_average + 1); */
-  /* int index_item_bytes = sizeof(uint32_t); */
-
-  /* int psram_size = ESP.getFreePsram(); */
-
-  /* uint8_t size = psram_size / (command_bytes + index_item_bytes); */
-
-  /* store.init((uint32_t* )ps_malloc(index_item_bytes * size), */
-  /*            size, */
-  /*            (Entry* )ps_malloc(command_bytes * size), */
-  /*            size * entries_average); */
-
-  return true;
-}
 
 bool init_server() {
   if(!SPIFFS.begin(true)){
@@ -279,27 +270,32 @@ bool init_server() {
   Serial.print("AP IP address: ");
   Serial.println(myIP);
 
+  server.on("/tlm", HTTP_GET, []() {
+      handleDataRequest(false);
+    });
+  server.on("/gs", HTTP_GET, []() {
+      handleDataRequest(true);
+    });
+  server.on("/", HTTP_GET, [](){
+      File file = SPIFFS.open("/index.html", "r");
+      if (!file || !file.available()) return false;
+      server.streamFile(file, "text/html");
+      file.close();
+    });
+  server.serveStatic("/", SPIFFS, "/");
+  server.onNotFound([]() {
+      log_d("404");
+      server.send(404, "text/plain", "File Not Found");
+    });
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-      request->send(SPIFFS, "/index.html");
-    });
-  server.on("/pure-min.css", HTTP_GET, [](AsyncWebServerRequest *request){
-      request->send(SPIFFS, "/pure-min.css", "text/css");
-    });
-  server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
-      request->send(SPIFFS, "/style.css", "text/css");
-    });
-  server.on("/jquery.js", HTTP_GET, [](AsyncWebServerRequest *request){
-      request->send(SPIFFS, "/jquery.js", "text/javascript");
-    });
-  server.on("/main.js", HTTP_GET, [](AsyncWebServerRequest *request){
-      request->send(SPIFFS, "/main.js", "text/javascript");
-    });
-  server.on("/data", HTTP_GET, request_data);
 
-  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
-  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "*");
+  /* DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*"); */
+  /* DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "*"); */
+
+  server.enableCORS();
+
   server.begin();
+
 
   MDNS.begin("gs");
   MDNS.addService("http", "tcp", 80);
@@ -309,43 +305,58 @@ bool init_server() {
   return true;
 }
 
-void writeData(byte t_data) {
-  Wire.beginTransmission(LCD_ADRS);
-  Wire.write(0x40);//送信する１バイトのデータ
-  Wire.write(t_data);//文字列の送信
-  Wire.endTransmission();
-  delay(1);
+bool handleFileRead(String path, String contentType) {
+  log_d("read: %s",path);
+
+  File file = SPIFFS.open(path, "r");
+  log_d("opened");
+  if (file.isDirectory()){
+    file.close();
+    log_d("Not directory: %s", path);
+    return false;
+  }
+
+  server.streamFile(file, contentType);
+  file.close();
+  return true;
 }
 
-void writeCommand(byte t_command) {
-  Wire.beginTransmission(LCD_ADRS);
-  Wire.write(0x00);
-  Wire.write(t_command);
-  Wire.endTransmission();
-  delay(10);
+
+
+bool init_datastore() {
+  psramInit();
+  log_d("Total heap: %d", ESP.getHeapSize());
+  log_d("Free heap: %d", ESP.getFreeHeap());
+  log_d("Total PSRAM: %d", ESP.getPsramSize());
+  log_d("Free PSRAM: %d", ESP.getFreePsram());
+
+  int tlm_mem_size = ESP.getFreePsram() / 3;
+  int gs_mem_size = ESP.getFreePsram() / 3;
+
+  received_tlm_commands = (Command*)ps_malloc(tlm_mem_size);
+  received_tlm_max = tlm_mem_size / sizeof(Command);
+  received_tlm_count = 0;
+
+
+  received_gs_commands = (Command*)ps_malloc(gs_mem_size);
+  received_gs_max = gs_mem_size / sizeof(Command);
+  received_gs_count = 0;
+
+  if (received_tlm_commands == NULL || received_gs_commands == NULL) {
+    Serial.println("Failed to alloc memory");
+    return false;
+  }
+
+
+  Serial.print("Allocated ");
+  Serial.print(received_gs_max);
+  Serial.print(" + ");
+  Serial.println(received_gs_max);
+
+  return true;
 }
 
-void init_LCD() {
-  delay(20);
-  writeCommand(0x38);
-  delay(20);
-  writeCommand(0x39);
-  delay(20);
-  writeCommand(0x14);
-  delay(20);
-  writeCommand(0x73);
-  delay(20);
-  writeCommand(0x56);
-  delay(20);
-  writeCommand(0x6C);
-  delay(20);
-  writeCommand(0x38);
-  delay(20);
-  writeCommand(0x01);
-  delay(20);
-  writeCommand(0x0C);
-  delay(20);
-}
+
 
 void addDummyCANData() {
   Command command('B', 0, 'G', 5);
@@ -355,14 +366,13 @@ void addDummyCANData() {
   command.entries[3].set('c', (float)(random(0, 100) / 100.0));
   command.entries[4].set('d', (float)(random(0, 100) / 100.0));
 
-  received_commands[received_count] = command;
-  received_count++;
-  if (received_count >= received_count_max) {
-    received_count = 0;
-    }
+  addReceivedGSCommand(command);
 }
 
-
+void blink() {
+  blink_ms = millis();
+  digitalWrite(LED_PIN, HIGH);
+}
 
 void i2c_scanner() {
     byte error, address;
