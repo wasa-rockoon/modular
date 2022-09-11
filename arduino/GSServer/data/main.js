@@ -1,14 +1,18 @@
 'use strick';
 
-host = 'http://192.168.1.1'
+let host = ''
+host = 'http://gs.local'
+
+const LAUNCHER_MODE = false
 
 const POLLING_FREQ = 1
+const MAX_PLOT_ELEMENT = 2000
 
-let tlm_index = -1;
-let gs_index = -1;
+let remote_index = 0;
+let local_index = 0;
 
-let tlm_packets = {};
-let gs_packets = {};
+let remote_packets = {};
+let local_packets = {};
 
 Chart.defaults.global.defaultFontColor = "#fff";
 
@@ -35,15 +39,52 @@ const command_format = {
   'S': {
     name: 'LoRa TX',
     entries: {
-      'C': { name: 'Code', unit: '', datatype: 'int' },
+      'C': { name: 'Code', datatype: 'int' },
+      'O': { name: 'OK', datatype: 'uint' },
+      'E': { name: 'NG', datatype: 'uint' },
     }
   },
   'R': {
     name: 'LoRa RX',
     entries: {
       'R': { name: 'RSSI', unit: 'dBm', datatype: 'int' },
+      'C': { name: 'Count', datatype: 'uint' },
     }
   },
+
+  // Telemetry and Command
+  'n': {
+    name: 'Navigation',
+    entries: {
+      'O': { name: 'Longitude', unit: '°', datatype: 'float' },
+      'A': { name: 'Latitude',  unit: '°', datatype: 'float' },
+      'H': { name: 'GPS Alt',  unit: 'm', datatype: 'float' },
+      'P': { name: 'Pressure Alt',  unit: 'm', datatype: 'float' },
+    }
+  },
+  'm': {
+    name: 'Mode',
+    entries: {
+      'N': { name: 'Launch', payload: 'No', error: true },
+      'A': { name: 'Launch', payload: 'Allow' },
+      'S': { name: 'Mode', payload: 'Standby'  },
+      'F': { name: 'Mode', payload: 'Flight' },
+      'L': { name: 'Mode', payload: 'Launch' },
+    }
+  },
+  's': {
+    name: 'Settings',
+    entries: {
+      'I': { name: 'Min Launch Alt', unit: 'm', datatype: 'float' },
+      'S': { name: 'Std Launch Alt', unit: 'm', datatype: 'float' },
+      'A': { name: 'Max Launch Alt', unit: 'm', datatype: 'float' },
+      'Q': { name: 'QNH', unit: 'hPa', datatype: 'float' },
+    }
+  },
+
+  // Command
+
+
   'Sample': {
     name: 'Sample',
     entries: {
@@ -58,8 +99,8 @@ const command_format = {
 
 const charts = [
   {
-    name: 'Location',
-    gs: false,
+    name: 'Launcher Location',
+    local: LAUNCHER_MODE,
     id: 'P',
     x: 'O',
     y: ['A'],
@@ -67,8 +108,8 @@ const charts = [
     yLabel: 'Latitude [deg]'
   },
   {
-    name: 'Altitude',
-    gs: true,
+    name: 'Launcher Altitude',
+    local: LAUNCHER_MODE,
     id: 'P',
     x: 't',
     y: ['H'],
@@ -76,19 +117,29 @@ const charts = [
     yLabel: 'Altitude [m]'
   },
   {
-    name: 'Battery',
-    gs: false,
+    name: 'Launcher Battery',
+    local: LAUNCHER_MODE,
     id: 'B',
     x: 't',
     y: ['P', 'C', 'D'],
     xLabel: 't [ms]',
     yLabel: 'Voltage [V]',
-    yMin: 0,
-    yMax: 15
+    // yMin: 0,
+    // yMax: 15
   },
   {
-    name: 'Location',
-    gs: true,
+    name: 'LoRa RX',
+    local: true,
+    id: 'R',
+    x: 't',
+    y: ['R'],
+    xLabel: 't [ms]',
+    yLabel: 'RSSI [V]',
+    yMax: 0,
+  },
+  {
+    name: 'GS Location',
+    local: true,
     id: 'P',
     x: 'O',
     y: ['A'],
@@ -96,15 +147,15 @@ const charts = [
     yLabel: 'Latitude [deg]'
   },
   {
-    name: 'Battery',
-    gs: true,
+    name: 'GS Battery',
+    local: !LAUNCHER_MODE,
     id: 'B',
     x: 't',
     y: ['P', 'C', 'D'],
     xLabel: 't [ms]',
     yLabel: 'Voltage [V]',
-    yMin: 0,
-    yMax: 10,
+    // yMin: 0,
+    // yMax: 10,
   },
 ]
 
@@ -123,6 +174,7 @@ function createCharts() {
           data: [],
           showLine: true,
           fill: false,
+          pointRadius: 0,
         }
       })
     }
@@ -136,12 +188,18 @@ function createCharts() {
         },
         element: {
           point: {
-            radius: 1,
+            radius: 0,
           }
+        },
+        legend: {
+          display: chart.y.length > 1
         },
         scales: {
           xAxes: [{
             display: true,
+            gridLines: {
+              color: '#606060'
+            },
             ticks:  {
               min: chart.xMin,
               max: chart.xMax
@@ -153,6 +211,9 @@ function createCharts() {
           }],
           yAxes: [{
             display: true,
+            gridLines: {
+              color: '#606060'
+            },
             ticks:  {
               min: chart.yMin,
               max: chart.yMax
@@ -162,7 +223,8 @@ function createCharts() {
               labelString: chart.yLabel
             }}
           ]
-        }
+        },
+        animation: false,
       }
     }
 
@@ -173,12 +235,24 @@ function createCharts() {
 function addHistory(command) {
 
   for (chart of charts) {
-    if (chart.id == command.id) {
+    if (chart.id == command.id && chart.local == command.local) {
       const x = command.entries.find(entry => entry.type == chart.x).payload;
-      chart.chart.data.labels.push(x.payload);
-
-
       chart.chart.data.datasets.forEach((dataset) => {
+        if (dataset.data.length > MAX_PLOT_ELEMENT) {
+          let data = [];
+          for (let i = 0; i < Math.floor(dataset.data.length / 2); i++) {
+            if (i * 2 + 1 == dataset.data.length) {
+              data.push(dataset.data[i * 2]);
+            }
+            else {
+              data.push({
+                x: (dataset.data[i * 2].x + dataset.data[i * 2 + 1].x) / 2,
+                y: (dataset.data[i * 2].y + dataset.data[i * 2 + 1].y) / 2,
+              })
+            }
+          }
+          dataset.data = data;
+        }
         const y = command.entries.find(
           entry => entry.type == dataset.entry_type).payload;
         dataset.data.push({x, y});
@@ -189,7 +263,12 @@ function addHistory(command) {
 }
 
 function main() {
-  setInterval(fetch, 1000 / POLLING_FREQ);
+  setInterval(() => {
+    fetch(true);
+    setTimeout(() => {
+      fetch(false);
+    }, 1000 / POLLING_FREQ / 2);
+  }, 1000 / POLLING_FREQ);
 
   $('#connection-error').hide();
 
@@ -208,66 +287,81 @@ function main() {
   render();
 }
 
-function fetch() {
-  // gs_packets['Sample'].updated = true;
+function fetch(local) {
+  // local_packets['Sample'].updated = true;
 
-  for (let id in tlm_packets) {
-    tlm_packets[id].updated = false;
+  if (local) {
+    for (let id in local_packets) {
+      local_packets[id].updated = false;
+    }
   }
-  for (let id in gs_packets) {
-    gs_packets[id].updated = false;
+  else {
+    for (let id in remote_packets) {
+      remote_packets[id].updated = false;
+    }
   }
 
-  console.log('fetch', tlm_index, gs_index);
+  // if (local) console.log('fetch local',  local_index);
+  // else console.log('fetch remote',  remote_index);
 
-  for (gs of [false, true]) {
-    $.ajax({
-      url: host + (gs ? '/gs' : '/tlm'),
-      type: 'GET',
-      data: { index: gs ? gs_index : tlm_index },
-      dataType: 'text',
-      async: true,
-      cache: false,
-      timeout: 1000 / POLLING_FREQ}).then((str) => {
-        $('#connection-error').hide();
+  $.ajax({
+    url: host + (local ? '/local' : '/remote'),
+    type: 'GET',
+    data: { index: local ? local_index : remote_index },
+    dataType: 'text',
+    async: true,
+    cache: false,
+    timeout: 1000 / POLLING_FREQ}).then((str) => {
+      $('#connection-error').hide();
 
-        const lines = str.split('\n').filter(line => line != "");
-        if (gs) gs_index += lines.length;
-        else tlm_index += lines.length;
-        const commands = lines.map(parseCommandHex);
+      const lines = str.split('\n').filter(line => line != "");
 
-        commands.forEach((command, i) => {
-          console.log('command ' + ((gs ? gs_index : tlm_index ) + i), command);
-          command.updated = true;
-          command.date = new Date();
+      console.log('returned', parseInt(lines[0]));
 
-          addHistory(command);
+      if (local) local_index = parseInt(lines[0]);
+      else remote_index = parseInt(lines[0]);
 
-          if (gs) gs_packets[command.id] = command;
-          else tlm_packets[command.id] = command;
-        });
+      lines.shift();
 
-        render();
-      }).catch((e) => {
-        $('#connection-error').show();
-        console.error(e);
-        render();
+      const commands = lines.map(parseCommandHex);
+
+      commands.forEach((command, i) => {
+        console.log('command ' + ((local ? local_index : remote_index ) + i),
+                    command);
+        command.updated = true;
+        command.date = new Date();
+        command.local = local;
+
+        addHistory(command);
+
+        if (local) local_packets[command.id] = command;
+        else remote_packets[command.id] = command;
       });
-  }
+
+      render(local);
+    }).catch((e) => {
+      $('#connection-error').show();
+      console.error(e);
+      render(local);
+    });
 }
 
-function render() {
+function render(local) {
   // $('#rocket-packets').empty();
   // for (let id in rocket_packets) {
   //   $('#rocket-packets').append(commandItem(rocket_packets[id]));
   // }
-  $('#tlm-packets').empty();
-  for (let id in tlm_packets) {
-    $('#tlm-packets').append(commandItem(tlm_packets[id]));
+  if (local) {
+    $('#local-packets').empty();
+    for (let id in local_packets) {
+      $('#local-packets').append(commandItem(local_packets[id]));
+    }
   }
-  $('#gs-packets').empty();
-  for (let id in gs_packets) {
-    $('#gs-packets').append(commandItem(gs_packets[id]));
+  else {
+    $('#remote-packets').empty();
+    for (let id in remote_packets) {
+      $('#remote-packets').append(commandItem(remote_packets[id]));
+    }
   }
 }
 
@@ -295,9 +389,9 @@ function entryItem(entry) {
   let normal = entry.normal;
   if (normal && entry.datatype == 'float') normal = normal.toFixed(4);
 
-  return `<tr>
-            <td>${entry.name} [${entry.unit}]</td>
-            <td>${payload}</td>
+  return `<tr class="${entry.error ? 'error' : ''}">
+            <td>${entry.name} ${entry.unit ? '[' + entry.unit + ']' : ''}</td>
+            <td>${payload == null ? '' : payload}</td>
           </tr>`;
 }
 
@@ -342,7 +436,9 @@ function parseCommandHex(line) {
         view.setUint8(3 - n, bytes[i + n + 1]);
       }
 
-      if (type == 't') {
+      if (entry.payload != undefined) {
+      }
+      else if (type == 't') {
         entry.payload = view.getUint32(0);
         command.t = entry.payload;
       }
@@ -356,6 +452,9 @@ function parseCommandHex(line) {
           break;
         case 'time':
           entry.payload = new Date(view.getUint32(0) * 1000);
+          break;
+        case undefined:
+          entry.payload = null;
           break;
         default:
           entry.payload = line.slice(i * 2 + 2, i * 2 + 12);

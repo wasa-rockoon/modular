@@ -25,12 +25,28 @@ table {
     animation: update 0.5s ease-out both;
 }
 
+tr.error {
+    background: #800000;
+}
+.command.updated tr.error {
+    animation: update-error 0.5s ease-out both;
+}
+
 @keyframes update {
     0% {
         background: #558b2f;
     }
     100% {
         background: transparent;
+    }
+}
+
+@keyframes update-error {
+    0% {
+        background: red;
+    }
+    100% {
+        background: #800000;
     }
 }
 

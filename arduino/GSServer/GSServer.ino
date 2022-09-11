@@ -1,7 +1,9 @@
+#define CONFIG_ASYNC_TCP_USE_WDT 0
+
 #include <TinyGPS++.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
-#include <WebServer.h>
+#include <ESPAsyncWebServer.h>
 #include <AsyncJson.h>
 #include <SPIFFS.h>
 #include <CAN.h>
@@ -15,38 +17,48 @@
 #define CAN_RX_PIN 32
 #define CAN_TX_PIN 33
 #define LED_PIN 2
+#define SWITCH_PIN_1 12
+#define SWITCH_PIN_2 13
+#define SWITCH_PIN_3 14
 
 #define CAN_BAUD 125000
 static const uint32_t GPSBaud = 9600;
 
-#define RETURN_COMMAND_MAX 1000
-
+#define RETURN_COMMAND_MAX 100
+#define SEND_COMMAND_FREQ 1
 #define BLINK_MS 50
 
 const char ssid[] = "Rockoon-GS";
 const char pass[] = "rockoon-gs";
 const IPAddress ip(192,168,1,1);
 const IPAddress subnet(255,255,255,0);
-WebServer server(80);
-
-CANChannel can_channel;
-HexChannel hex_channel;
-StaticJsonDocument<512> json;
-
-Command* received_tlm_commands;
-uint32_t received_tlm_count;
-uint32_t received_tlm_max;
-
-Command* received_gs_commands;
-uint32_t received_gs_count;
-uint32_t received_gs_max;
+AsyncWebServer server(80);
 
 
 LCD lcd;
 TinyGPSPlus gps;
 HardwareSerial ss(2);
 
+CANChannel can_channel;
+HexChannel hex_channel;
+
+Command* received_remote_commands;
+uint32_t received_remote_count;
+uint32_t received_remote_max;
+
+Command* received_local_commands;
+uint32_t received_local_count;
+uint32_t received_local_max;
+
+enum class SwitchState {
+  NotSelected,
+  NoLaunch,
+  AllowLaunch,
+};
+
+SwitchState switch_state = SwitchState::NotSelected;
 unsigned long blink_ms;
+unsigned long sent_command_ms;
 
 
 void setup() {
@@ -58,6 +70,10 @@ void setup() {
   /* pinMode(22, INPUT_PULLUP); */
 
   pinMode(LED_PIN, OUTPUT);
+  pinMode(SWITCH_PIN_1, INPUT_PULLUP);
+  pinMode(SWITCH_PIN_2, INPUT_PULLUP);
+  pinMode(SWITCH_PIN_3, INPUT_PULLUP);
+
   digitalWrite(LED_PIN, HIGH);
 
   i2c_scanner();
@@ -74,7 +90,7 @@ void setup() {
 
   CAN.setPins(CAN_RX_PIN, CAN_TX_PIN);
   CAN.begin(CAN_BAUD * 2);
-  CAN.onReceive(onCANReceive);
+  /* CAN.onReceive(onCANReceive); */
 
   digitalWrite(LED_PIN, LOW);
 
@@ -88,6 +104,8 @@ void setup() {
 
 void loop() {
 
+  int packetSize = CAN.parsePacket();
+  if (packetSize > 0) onCANReceive(packetSize);
 
   // Read GPS
   while(ss.available()){
@@ -111,17 +129,16 @@ void loop() {
     t.tm_isdst = -1;
     time_t epoch = mktime(&t);
 
-    Command position('P', 0, 0, 5);
+    Command position('P', 0, 0, 4);
     position.entries[0].set('O', (float)gps.location.lng());
     position.entries[1].set('A', (float)gps.location.lat());
     position.entries[2].set('H', (float)gps.altitude.meters());
     position.entries[3].set('T', (uint32_t)(epoch));
-    position.entries[4].set('t', (uint32_t)(millis()));
 
     can_channel.tx.push(position);
     sendCAN();
 
-    addReceivedGSCommand(position);
+    addReceivedCommand(position);
 
     strcpy(lcd.line1, "G Lng=");
     strcpy(lcd.line2, "G Lat= ");
@@ -132,7 +149,7 @@ void loop() {
 
   lcd.update();
 
-  server.handleClient();
+  /* server.handleClient(); */
 
   /* Serial.print("data: "); */
   /* Serial.println(received_count); */
@@ -145,6 +162,26 @@ void loop() {
     digitalWrite(LED_PIN, LOW);
   }
 
+  if      (!digitalRead(SWITCH_PIN_2)) switch_state = SwitchState::NotSelected;
+  else if (!digitalRead(SWITCH_PIN_1)) switch_state = SwitchState::NoLaunch;
+  else if (!digitalRead(SWITCH_PIN_3)) switch_state = SwitchState::AllowLaunch;
+  else                                 switch_state = SwitchState::NotSelected;
+
+  // Send mode command
+  if (millis() > sent_command_ms + 1000 / SEND_COMMAND_FREQ) {
+    printSwitchState();
+
+    if (switch_state != SwitchState::NotSelected) {
+      Command command('m', 'L', 0, 1);
+      uint8_t type = switch_state == SwitchState::AllowLaunch ? 'A' : 'N';
+      command.entries[0].set(type);
+
+      can_channel.tx.push(command);
+      sendCAN();
+      addReceivedCommand(command);
+    }
+    sent_command_ms = millis();
+  }
 }
 
 
@@ -167,9 +204,7 @@ void onCANReceive(int packetSize) {
   }
 
   if (can_channel.receive(id, data, len)) {
-    can_channel.rx.entries[can_channel.rx.size].set('t', (uint32_t)(millis()));
-    can_channel.rx.size += 1;
-    addReceivedTlmCommand(can_channel.rx);
+    addReceivedCommand(can_channel.rx);
   }
 }
 
@@ -194,47 +229,61 @@ void sendCAN() {
 	}
 }
 
-void addReceivedTlmCommand(Command &command) {
-  Serial.print("tlm: ");
-  Serial.println(received_tlm_count);
-  blink();
+void addReceivedCommand(const Command& c) {
+  Command command = c;
+  command.entries[command.size].set('t', (uint32_t)(millis()));
+  command.size += 1;
 
-  received_tlm_commands[received_tlm_count % received_tlm_max] = command;
-  received_tlm_count++;
-}
-void addReceivedGSCommand(Command &command) {
-  Serial.print("tlm: ");
-  Serial.println(received_gs_count);
-  blink();
+  if (command.from == 0) {
+    received_local_commands[received_local_count % received_local_max] =
+      command;
+    received_local_count++;
 
-  received_gs_commands[received_gs_count % received_gs_max] = command;
-  received_gs_count++;
-}
+    Serial.print("local: ");
+    Serial.println(received_local_count);
+  }
+  else {
+    received_remote_commands[received_remote_count % received_remote_max] =
+      command;
+    received_remote_count++;
 
-void handleDataRequest(bool gs = false) {
-  int request_index = 0;
-
-  for (int i = 0; i < server.args(); i++) {
-    if (server.argName(i) == "index") {
-      request_index = server.arg(i).toInt();
-    }
+    Serial.print("remote: ");
+    Serial.println(received_remote_count);
   }
 
-  if (request_index < 0) request_index = 0;
+  blink();
+}
 
-  int index_from = request_index % (gs ? received_gs_max : received_tlm_max);
+
+void handleDataRequest(AsyncWebServerRequest *request, bool local = false) {
+  uint32_t received_count =
+    local ? received_local_count : received_remote_count;
+  uint32_t received_max =
+    local ? received_local_max : received_remote_max;
+
+  AsyncWebParameter *p = request->getParam("index");
+  int request_index;
+
+  if (p == NULL) request_index = 0;
+  else request_index = p->value().toInt();
+
+  uint32_t index_from = request_index;
+  if (request_index < 0) index_from = 0;
+  else if (request_index > received_count)
+    index_from = received_count;
 
   String response;
 
   int index = index_from;
 
   for (int n = 0; n < RETURN_COMMAND_MAX; n++) {
-    if (index == (gs ? received_gs_count : received_tlm_count)) break;
+    if (index == received_count) break;
 
     hex_channel.tx.push
-      ((gs ? received_gs_commands : received_tlm_commands)[index]);
+      ((local ? received_local_commands : received_remote_commands)
+       [index % received_max]);
 
-    uint8_t buf[12];
+    uint8_t buf[14];
     uint8_t len;
     while (true) {
       int remains = hex_channel.send(buf, len);
@@ -243,13 +292,14 @@ void handleDataRequest(bool gs = false) {
     }
 
     index++;
-    if (index == (gs ? received_gs_max : received_tlm_max)) index = 0;
+    if (index == received_max) index = 0;
   }
 
-  log_d("requested tlm data: %d, return %d to %d",
-        request_index, index_from, index);
+  log_d("requested %s data: %d, return %d to %d, %d chars",
+        local ? "local" : "remote", request_index, index_from, index,
+        response.length());
 
-  server.send(200, "text/plain", response);
+  request->send(200, "text/plain", String(index) + '\n' + response);
 }
 
 
@@ -270,29 +320,22 @@ bool init_server() {
   Serial.print("AP IP address: ");
   Serial.println(myIP);
 
-  server.on("/tlm", HTTP_GET, []() {
-      handleDataRequest(false);
+  server.on("/remote", HTTP_GET, [](AsyncWebServerRequest *request) {
+      handleDataRequest(request, false);
     });
-  server.on("/gs", HTTP_GET, []() {
-      handleDataRequest(true);
+  server.on("/local", HTTP_GET, [](AsyncWebServerRequest *request) {
+      handleDataRequest(request, true);
     });
-  server.on("/", HTTP_GET, [](){
-      File file = SPIFFS.open("/index.html", "r");
-      if (!file || !file.available()) return false;
-      server.streamFile(file, "text/html");
-      file.close();
-    });
-  server.serveStatic("/", SPIFFS, "/");
-  server.onNotFound([]() {
-      log_d("404");
-      server.send(404, "text/plain", "File Not Found");
+  server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
+  server.onNotFound([](AsyncWebServerRequest *request) {
+      request->send(404, "text/plain", "File Not Found");
     });
 
 
-  /* DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*"); */
-  /* DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "*"); */
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "*");
 
-  server.enableCORS();
+  /* server.enableCORS(); */
 
   server.begin();
 
@@ -305,21 +348,6 @@ bool init_server() {
   return true;
 }
 
-bool handleFileRead(String path, String contentType) {
-  log_d("read: %s",path);
-
-  File file = SPIFFS.open(path, "r");
-  log_d("opened");
-  if (file.isDirectory()){
-    file.close();
-    log_d("Not directory: %s", path);
-    return false;
-  }
-
-  server.streamFile(file, contentType);
-  file.close();
-  return true;
-}
 
 
 
@@ -333,25 +361,25 @@ bool init_datastore() {
   int tlm_mem_size = ESP.getFreePsram() / 3;
   int gs_mem_size = ESP.getFreePsram() / 3;
 
-  received_tlm_commands = (Command*)ps_malloc(tlm_mem_size);
-  received_tlm_max = tlm_mem_size / sizeof(Command);
-  received_tlm_count = 0;
+  received_remote_commands = (Command*)ps_malloc(tlm_mem_size);
+  received_remote_max = tlm_mem_size / sizeof(Command);
+  received_remote_count = 0;
 
 
-  received_gs_commands = (Command*)ps_malloc(gs_mem_size);
-  received_gs_max = gs_mem_size / sizeof(Command);
-  received_gs_count = 0;
+  received_local_commands = (Command*)ps_malloc(gs_mem_size);
+  received_local_max = gs_mem_size / sizeof(Command);
+  received_local_count = 0;
 
-  if (received_tlm_commands == NULL || received_gs_commands == NULL) {
+  if (received_remote_commands == NULL || received_local_commands == NULL) {
     Serial.println("Failed to alloc memory");
     return false;
   }
 
 
   Serial.print("Allocated ");
-  Serial.print(received_gs_max);
+  Serial.print(received_local_max);
   Serial.print(" + ");
-  Serial.println(received_gs_max);
+  Serial.println(received_local_max);
 
   return true;
 }
@@ -359,19 +387,33 @@ bool init_datastore() {
 
 
 void addDummyCANData() {
-  Command command('B', 0, 'G', 5);
+  Command command('B', 0, 0, 5);
   command.entries[0].set('P', (float)(9.0 + random(-50, 50) / 100.0));
   command.entries[1].set('C', (float)(5.0 + random(-50, 50) / 100.0));
   command.entries[2].set('D', (float)(3.3 + random(-50, 50) / 100.0));
   command.entries[3].set('c', (float)(random(0, 100) / 100.0));
   command.entries[4].set('d', (float)(random(0, 100) / 100.0));
 
-  addReceivedGSCommand(command);
+  addReceivedCommand(command);
 }
 
 void blink() {
   blink_ms = millis();
   digitalWrite(LED_PIN, HIGH);
+}
+
+void printSwitchState() {
+  switch (switch_state) {
+  case SwitchState::NotSelected:
+    Serial.println("Switch: Not selected");
+    break;
+  case SwitchState::NoLaunch:
+    Serial.println("Switch: Abort");
+    break;
+  case SwitchState::AllowLaunch:
+    Serial.println("Switch: Launch");
+    break;
+    }
 }
 
 void i2c_scanner() {
