@@ -46,16 +46,17 @@ uint8_t Entry::encode(uint8_t* buf) const {
     }
 }
 
-bool Entry::decode(const uint8_t* buf, uint8_t len) {
+uint8_t Entry::decode(const uint8_t* buf) {
 	type = buf[0] & 0b01111111;
-	if (len == 5 && !(buf[0] & 0b10000000)) {
+
+	if ((buf[0] & 0b10000000)) {
+		payload.uint = 0;
+		return 1;
+	}
+	else {
 		for (int i = 0; i < 4; i++) payload.bytes[i] = buf[1 + i];
-		return true;
+		return 5;
 	}
-	else if (len == 1 && (buf[0] & 0b10000000)) {
-		return true;
-	}
-	else return false;
 }
 
 uint8_t Entry::encodeHex(uint8_t* buf) const {
@@ -101,9 +102,9 @@ uint8_t Entry::decodeHex(const uint8_t* buf) {
 
     type = data[0] & 0b01111111;
 
-    if (buf[0] & 0b1000000) {
+    if (data[0] & 0b1000000) {
+    	payload.uint = 0;
     	return 2;
-    	payload.int_ = 0;
     }
     else {
 		for (int i = 1; i < 5; i++) {
@@ -117,6 +118,13 @@ uint8_t Entry::decodeHex(const uint8_t* buf) {
 		return 10;
     }
 }
+
+
+Command::Command(): id(0), to(0), from(0), size(0) {};
+Command::Command(uint8_t id, uint8_t to, uint8_t from, uint8_t size):
+		id(id), to(to), from(from), size(size) {};
+
+
 
 void Command::setHeader(Entry header) {
 	id = header.payload.bytes[0];
@@ -135,67 +143,193 @@ Entry Command::getHeader() const {
 	return header;
 }
 
-CANChannel::CANChannel() {
-	receiving = -1;
-	sending = -1;
+float Command::get(uint8_t type, uint8_t index, float dufault) const {
+	Payload p = { .float_ = 0.0 };
+	get(type, index, p);
+	return p.float_;
 }
 
-bool CANChannel::receive(uint8_t std_id, const uint8_t* data, uint8_t len) {
+bool Command::get(uint8_t type, uint8_t index) const {
+	Payload p;
+	return get(type, index, p);
+}
+
+bool Command::get(uint8_t type, uint8_t index, union Payload& p) const {
+	for (int n = 0; n < size; n++) {
+		if (entries[n].type == type) {
+			if (index == 0) {
+				p = entries[n].payload;
+				return true;
+			}
+			else index--;
+		}
+	}
+	return false;
+}
+
+void Command::addTimestamp(uint32_t time) {
+	entries[size].set('t', time);
+	size++;
+}
+
+Command& Command::operator=(const Command& command) {
+	id = command.id;
+	to = command.to;
+	from = command.from;
+	size = command.size;
+	for (int n = 0; n < size; n++) {
+		entries[n].type = command.entries[n].type;
+		entries[n].payload = command.entries[n].payload;
+	}
+	return *this;
+}
+
+template<uint8_t N>
+Queue<N>::Queue() {
+	size_ = 0;
+	read_ptr_ = 0;
+	write_ptr_ = 0;
+}
+
+//template<uint8_t N>
+//bool Queue<N>::push(Command& command) {
+//	if (size_ == N) return false;
+//
+//	buf[write_ptr_] = command;
+//
+//	return push();
+//}
+//
+//template<uint8_t N>
+//bool Queue<N>::push() {
+//	if (size_ == N) return false;
+//
+//	write_ptr_++;
+//	if (write_ptr_ >= N) write_ptr_ = 0;
+//	size_++;
+//
+//	return true;
+//}
+//
+//template<uint8_t N>
+//bool Queue<N>::pop(Command& command) {
+//	if (size_ == 0) return false;
+//
+//	command = first();
+//
+//	return pop();
+//}
+//
+//template<uint8_t N>
+//bool Queue<N>::pop() {
+//	if (size_ == 0) return false;
+//
+//	read_ptr_++;
+//	if (read_ptr_ >= N) read_ptr_ = 0;
+//	size_--;
+//
+//	return true;
+//}
+
+template<uint8_t TXQ>
+Channel<TXQ>::Channel() {
+	receiving_ = -1;
+	sending_ = -1;
+}
+
+
+HexChannel::HexChannel(): Channel() {
+	rx_buf_count_ = 0;
+}
+
+uint8_t HexChannel::send(uint8_t* data, uint8_t& len) {
+	if (tx.size() == 0) {
+		len = 0;
+		return 0;
+	}
+
+	if (sending_ == -1) {
+		Entry header = tx.first().getHeader();
+		len = header.encodeHex(data);
+		sending_ = 0;
+	}
+	else {
+		len = tx.first().entries[sending_].encodeHex(data);
+		sending_++;
+	}
+
+	int remains = tx.first().size - sending_;
+	if (remains == 0) {
+		sending_ = -1;
+		data[len] = '\n';
+		data[len+1] = '\0';
+		len++;
+
+		tx.pop();
+	}
+
+	return tx.size();
+}
+
+
+
+CANChannel::CANChannel(): Channel() {}
+
+bool CANChannel::receive(uint16_t std_id, const uint8_t* data, uint8_t len) {
 
 	Entry entry;
-	if (!entry.decode(data, len)) return false;
+	uint8_t decode_len = entry.decode(data);
+	if (len != decode_len) return false;
 
-	// Start receiving new command
+	std_id &= 0x0ff;
+
+	// Start receiving_ new command
 	if (entry.type == 0) {
 		rx.setHeader(entry);
-		receiving = 0;
+		if (rx.size > MAX_ENTRIES) rx.size = MAX_ENTRIES;
+		receiving_ = 0;
 	}
-	// Cancel receiving
-	else if (receiving == -1 || std_id != rx.id) {
-		receiving = -1;
+	// Cancel receiving_
+	else if (receiving_ == -1 || std_id != rx.id) {
+		receiving_ = -1;
 		return false;
 	}
-	// Continue receiving
+	// Continue receiving_
 	else {
-		rx.entries[receiving] = entry;
-		receiving++;
+		rx.entries[receiving_] = entry;
+		receiving_++;
 	}
 
-	if (receiving == rx.size) {
-		receiving = -1;
+	if (receiving_ == rx.size) {
+		receiving_ = -1;
 		return true;
 	}
 	else return false;
 }
 
-uint8_t CANChannel::send(uint8_t& std_id, uint8_t* data, uint8_t& len) {
-	std_id = tx.id;
-	if (receiving != -1) {
+uint8_t CANChannel::send(uint16_t& std_id, uint8_t* data, uint8_t& len) {
+	if (receiving_ != -1 || tx.size() == 0) {
 		len = 0;
-		return tx.size;
+		return tx.size();
 	}
-	if (sending == -1) {
-		Entry header = tx.getHeader();
+
+	std_id = tx.first().id;
+
+	if (((sending_ + 1) / 3) % 2 == 1) std_id |= 0x100;
+
+	if (sending_ == -1) {
+		Entry header = tx.first().getHeader();
 		len = header.encode(data);
-		sending = 0;
+		sending_ = 0;
 	}
 	else {
-		len = tx.entries[sending].encode(data);
-		sending++;
+		len = tx.first().entries[sending_].encode(data);
+		sending_++;
 	}
-	int remains = tx.size - sending;
-	if (remains == 0) sending = -1;
-	return remains;
-}
-
-void CANChannel::cancelSending() {
-	sending = -1;
-}
-
-bool CANChannel::isReceiving() {
-	return receiving != -1;
-}
-
-bool CANChannel::isSending() {
-	return sending != -1;
+	int remains = tx.first().size - sending_;
+	if (remains == 0) {
+		sending_ = -1;
+		tx.pop();
+	}
+	return tx.size();
 }

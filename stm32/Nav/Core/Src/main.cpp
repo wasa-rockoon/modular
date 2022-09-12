@@ -22,10 +22,12 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <cstdio>
+#include <time.h>
 #include "command.hpp"
-#include "bmx055.hpp"
 #include "bmp280.hpp"
-#include "algebra.hpp"
+//#include "lwgps.h"
+#include "TinyGPS++.h"
+#include "uart.hpp"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,7 +37,16 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SEND_TIMEOUT_TICK 40000
+#define CAN_SEND_TIMEOUT_TICK 10
+
+#define SAMPLE_FREQ 100
+#define TLM_FREQ 10
+
+#define GPS_LOST_TICK 100000
+
+#define PRESSURE_FILTER_A 0.5
+#define ALTITUDE_FILTER_A 0.5
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -46,8 +57,6 @@
 /* Private variables ---------------------------------------------------------*/
 FDCAN_HandleTypeDef hfdcan1;
 
-I2C_HandleTypeDef hi2c2;
-
 IWDG_HandleTypeDef hiwdg;
 
 SPI_HandleTypeDef hspi2;
@@ -56,8 +65,15 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart2_rx;
+
 
 /* USER CODE BEGIN PV */
+
+BMP280 bmp280(hspi2, CS_PRES_GPIO_Port, CS_PRES_Pin);
+
+TinyGPSPlus gps;
+UART gps_uart(huart2);
 
 CANChannel can;
 
@@ -67,13 +83,20 @@ uint8_t               CanTxData[8];
 uint8_t               CanRxData[8];
 uint32_t              CanTxMailbox;
 
+float pressure;
+float p_altitude;
+float temperature;
+
+float qnh_pa = 101325;
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_FDCAN1_Init(void);
-static void MX_I2C2_Init(void);
 static void MX_IWDG_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART2_UART_Init(void);
@@ -82,6 +105,8 @@ static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 extern "C" void initialise_monitor_handles(void);
 void CAN_Send();
+void CAN_Received();
+void Measure();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -92,37 +117,80 @@ void CAN_Send();
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim == &htim3) {
+    	// Sample
+
+    	float pressure_ = bmp280.readPressure();
+    	float p_altitude_ = bmp280.readAltitude(qnh_pa / 100.0);
+    	float temperature_ = bmp280.readTemperature();
+
+    	pressure = pressure * (1 - PRESSURE_FILTER_A) + pressure_ * PRESSURE_FILTER_A;
+    	p_altitude = p_altitude * (1 - PRESSURE_FILTER_A) + p_altitude_ * PRESSURE_FILTER_A;
+    	temperature = temperature * (1 - PRESSURE_FILTER_A) + temperature_ * PRESSURE_FILTER_A;
     }
     else if (htim == &htim4) {
-  	  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+
+    	if (!gps.location.isValid()) {
+    		Measure();
+    	}
+
 
   #ifndef DEBUG
-  	  HAL_IWDG_Refresh(&hiwdg);
+    	HAL_IWDG_Refresh(&hiwdg);
   #endif
     }
 }
 
 
-void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
-{
-	if (hfdcan->Instance == hfdcan1.Instance) {
-		  if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET) {
-			 if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &CanRxHeader, CanRxData) != HAL_OK){
-				 Error_Handler();
-			 }
+void Measure() {
 
-			 if (can.receive(CanRxHeader.Identifier, CanRxData, CanRxHeader.DataLength)) {
-				 can.rx;
+	Command pos('P', 0, 0, 1);
+	pos.entries[0].set('P', (float)p_altitude);
 
-				 HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-			 }
+	if (gps.location.isValid() && gps.location.age() < GPS_LOST_TICK) {
+		pos.entries[1].set('O', (float)gps.location.lng());
+		pos.entries[2].set('A', (float)gps.location.lat());
+		pos.entries[3].set('H', (float)gps.altitude.meters());
+		pos.entries[4].set('D', (uint32_t)gps.date.value());
+		pos.entries[5].set('T', (uint32_t)gps.time.value());
+		pos.entries[6].set('S', (int32_t)gps.satellites.value());
+		pos.size = 7;
+	}
+	can.tx.push(pos);
 
-#ifdef DEBUG
-			 printf("%c(%x), %d: %c(%x) %x %x %x %x \n",
-					 CanRxHeader.Identifier, CanRxHeader.Identifier, CanRxHeader.DataLength,
-					 CanRxData[0], CanRxData[0], CanRxData[1], CanRxData[2], CanRxData[3], CanRxData[4]);
-#endif
-		}
+	Command env('E', 0, 0, 2);
+	env.entries[0].set('P', (float)pressure);
+	env.entries[1].set('T', (float)temperature);
+
+	can.tx.push(env);
+
+	CAN_Send();
+
+//
+//#ifdef DEBUG
+//	printf("P %d\n", (int)(pressure));
+//	printf("H %d\n", (int)(p_altitude));
+//	printf("T %d\n", (int)(temperature));
+//	if (gps.location.isValid()) {
+//		printf("GPS: %d\n", gps.location.isValid());
+//		printf("Lat: %d\n", (int)(gps.location.lng() * 1000));
+//		printf("Lng: %d\n", (int)(gps.location.lat() * 1000));
+//		printf("Alt: %d\n", (int)(gps.altitude.meters() * 1000));
+//	}
+//#endif
+
+	HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+}
+
+
+
+void CAN_Received() {
+	if (can.rx.id == 's') {
+		qnh_pa = can.rx.get('Q', 0, qnh_pa);
+
+		Command setting('s', 0, 0, 1);
+		setting.entries[0].set('Q', qnh_pa);
+		can.tx.push(setting);
+		CAN_Send();
 	}
 }
 
@@ -159,8 +227,8 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_FDCAN1_Init();
-  MX_I2C2_Init();
   MX_IWDG_Init();
   MX_SPI2_Init();
   MX_USART2_UART_Init();
@@ -171,17 +239,15 @@ int main(void)
   printf("Start\n");
 #endif
 
-  BMX055 bmx055(hspi2, CS_ACCL_GPIO_Port, CS_ACCL_Pin,
-		  	  	  	   CS_GYRO_GPIO_Port, CS_GYRO_Pin,
-					   CS_MAG_GPIO_Port, CS_MAG_Pin);
-  BMP280 bmp280(hspi2, CS_PRES_GPIO_Port, CS_PRES_Pin);
+  HAL_Delay(100);
 
-  float qnh_hpa = 1013.25;
-
-  bool bmx055_ok = bmx055.begin();
   bool bmp280_ok = bmp280.begin();
+  HAL_Delay(100);
+  bmp280_ok = bmp280.begin();
 
-  printf("%d %d \n", bmx055_ok, bmp280_ok);
+#ifdef DEBUG
+  printf("BMP %d", bmp280_ok);
+#endif
 
   bmp280.setSampling(BMP280::MODE_NORMAL,     /* Operating Mode. */
 		  	  	     BMP280::SAMPLING_X2,     /* Temp. oversampling */
@@ -189,6 +255,9 @@ int main(void)
 					 BMP280::FILTER_X16,      /* Filtering. */
 					 BMP280::STANDBY_MS_500); /* Standby time. */
 
+
+    HAL_TIM_Base_Start_IT(&htim3);
+    HAL_TIM_Base_Start_IT(&htim4);
 
   /* USER CODE END 2 */
 
@@ -200,27 +269,20 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  Vec3 accel = bmx055.Accl.read();
-	  Vec3 gyro = bmx055.Gyro.read();
-	  Vec3 mag = bmx055.Mag.read();
+	  while (!gps_uart.rxIsEmpty()) {
+		  volatile uint8_t c = gps_uart.read();
+		  gps.encode(c);
+//		  printf("%c", c);
+	  }
 
-	  float altitude = bmp280.readAltitude(qnh_hpa);
+	  if (gps.location.isValid() && gps.location.isUpdated()) {
+		  Measure();
+	  }
+//
+//	  if (len > 0) {
+//		  lwgps_process(&gps, gps_data, len);
+//	  }
 
-#ifdef DEBUG
-	  char buf[64];
-	  accel.show(buf);
-	  printf("A %s\n", buf);
-	  gyro.show(buf);
-	  printf("G %s\n", buf);
-	  mag.show(buf);
-	  printf("M %s\n", buf);
-
-	  printf("P %d\n", (int)(altitude * 1000));
-
-#endif
-	  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-
-	  for (int i = 0; i < 10000000; i++);
   }
   /* USER CODE END 3 */
 }
@@ -291,10 +353,10 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
   hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
-  hfdcan1.Init.AutoRetransmission = DISABLE;
+  hfdcan1.Init.AutoRetransmission = ENABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
-  hfdcan1.Init.NominalPrescaler = 3;
+  hfdcan1.Init.NominalPrescaler = 24;
   hfdcan1.Init.NominalSyncJumpWidth = 1;
   hfdcan1.Init.NominalTimeSeg1 = 19;
   hfdcan1.Init.NominalTimeSeg2 = 5;
@@ -302,7 +364,7 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.DataSyncJumpWidth = 1;
   hfdcan1.Init.DataTimeSeg1 = 1;
   hfdcan1.Init.DataTimeSeg2 = 1;
-  hfdcan1.Init.StdFiltersNbr = 0;
+  hfdcan1.Init.StdFiltersNbr = 2;
   hfdcan1.Init.ExtFiltersNbr = 0;
   hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
   if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
@@ -311,12 +373,37 @@ static void MX_FDCAN1_Init(void)
   }
   /* USER CODE BEGIN FDCAN1_Init 2 */
 
+
+  FDCAN_FilterTypeDef filter0;
+  filter0.IdType = FDCAN_STANDARD_ID;
+  filter0.FilterIndex = 0;
+  filter0.FilterType = FDCAN_FILTER_MASK;
+  filter0.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+  filter0.FilterID1 = 0x000;
+  filter0.FilterID2 = 0x100;
+  if (HAL_FDCAN_ConfigFilter(&hfdcan1, &filter0) != HAL_OK)
+  {
+	Error_Handler();
+  }
+
+  FDCAN_FilterTypeDef filter1;
+  filter1.IdType = FDCAN_STANDARD_ID;
+  filter1.FilterIndex = 1;
+  filter1.FilterType = FDCAN_FILTER_MASK;
+  filter1.FilterConfig = FDCAN_FILTER_TO_RXFIFO1;
+  filter1.FilterID1 = 0x100;
+  filter1.FilterID2 = 0x100;
+  if (HAL_FDCAN_ConfigFilter(&hfdcan1, &filter1) != HAL_OK)
+  {
+	Error_Handler();
+  }
+
   if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK)
   {
 	  Error_Handler();
   }
 
-  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE | FDCAN_IT_RX_FIFO1_NEW_MESSAGE, 0) != HAL_OK)
   {
     Error_Handler();
   }
@@ -331,54 +418,6 @@ static void MX_FDCAN1_Init(void)
   CanTxHeader.MessageMarker = 0;
 
   /* USER CODE END FDCAN1_Init 2 */
-
-}
-
-/**
-  * @brief I2C2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2C2_Init(void)
-{
-
-  /* USER CODE BEGIN I2C2_Init 0 */
-
-  /* USER CODE END I2C2_Init 0 */
-
-  /* USER CODE BEGIN I2C2_Init 1 */
-
-  /* USER CODE END I2C2_Init 1 */
-  hi2c2.Instance = I2C2;
-  hi2c2.Init.Timing = 0x109093DC;
-  hi2c2.Init.OwnAddress1 = 0;
-  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c2.Init.OwnAddress2 = 0;
-  hi2c2.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
-  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Analogue filter
-  */
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Digital filter
-  */
-  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c2, 0) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2C2_Init 2 */
-
-  /* USER CODE END I2C2_Init 2 */
 
 }
 
@@ -474,7 +513,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 15000-1;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 99;
+  htim3.Init.Period = 10000 / SAMPLE_FREQ - 1;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -519,7 +558,7 @@ static void MX_TIM4_Init(void)
   htim4.Instance = TIM4;
   htim4.Init.Prescaler = 15000-1;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 999;
+  htim4.Init.Period = 10000 / TLM_FREQ - 1;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
@@ -587,7 +626,27 @@ static void MX_USART2_UART_Init(void)
   }
   /* USER CODE BEGIN USART2_Init 2 */
 
+  HAL_UART_Receive_DMA(&huart2, gps_uart.rx_buf(), RXBUFSIZE);
+
   /* USER CODE END USART2_Init 2 */
+
+}
+
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMAMUX1_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
 
 }
 
@@ -601,7 +660,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
@@ -615,38 +673,91 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(DRDYM_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LED_Pin CA_ACCL_Pin CS_MAG_Pin CS_GYRO_Pin
-                           CS_PRES_Pin */
-  GPIO_InitStruct.Pin = LED_Pin|CS_ACCL_Pin|CS_MAG_Pin|CS_GYRO_Pin
-                          |CS_PRES_Pin;
+  /*Configure GPIO pin : LED_Pin */
+  GPIO_InitStruct.Pin = LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : CS_ACCL_Pin CS_MAG_Pin CS_GYRO_Pin CS_PRES_Pin */
+  GPIO_InitStruct.Pin = CS_ACCL_Pin|CS_MAG_Pin|CS_GYRO_Pin|CS_PRES_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 }
+
+
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
+{
+	if (hfdcan->Instance == hfdcan1.Instance) {
+		  if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET) {
+			 if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &CanRxHeader, CanRxData) != HAL_OK){
+				 Error_Handler();
+			 }
+
+//			 printf("0%c\n", CanRxData[0]);
+//			 if (can.receive(CanRxHeader.Identifier, CanRxData, CanRxHeader.DataLength)) {
+//				 CAN_Received();
+//			 }
+		}
+	}
+}
+
+void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
+{
+	if (hfdcan->Instance == hfdcan1.Instance) {
+		  if ((RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE) != RESET) {
+			 if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO1, &CanRxHeader, CanRxData) != HAL_OK){
+				 Error_Handler();
+			 }
+//
+//			 printf("1%c\n", CanRxData[0]);
+//			 if (can.receive(CanRxHeader.Identifier, CanRxData, CanRxHeader.DataLength)) {
+//				 CAN_Received();
+//			 }
+		}
+	}
+}
+
 
 /* USER CODE BEGIN 4 */
 void CAN_Send() {
-	uint8_t std_id, len;
-
-	while (can.isReceiving());
-
 	while (true) {
-		int remains = can.send(std_id, CanTxData, len);
+		uint16_t std_id;
+		uint8_t len;
 
-		if (len == 0) continue;
-		CanTxHeader.Identifier = std_id;
-		CanTxHeader.DataLength = len;
+		volatile uint32_t tick = HAL_GetTick();
 
-		int tick = 0;
-		while (HAL_FDCAN_GetTxFifoFreeLevel(&hfdcan1) != 3) {
-			if (tick > SEND_TIMEOUT_TICK) {
-				can.cancelSending();
+		while (can.isReceiving()) {
+			if (HAL_GetTick() - tick >= CAN_SEND_TIMEOUT_TICK) {
+				can.cancelReceiving();
+		#ifdef DEBUG
+				printf("B\n");
+		#endif
 				return;
 			}
-			tick++;
 		}
+
+		while (HAL_FDCAN_GetTxFifoFreeLevel(&hfdcan1) != 3) {
+			if (HAL_GetTick() - tick >= CAN_SEND_TIMEOUT_TICK) {
+				HAL_FDCAN_AbortTxRequest(&hfdcan1, 0);
+				can.cancelSending();
+#ifdef DEBUG
+				printf("T\n");
+#endif
+				return;
+			}
+		}
+
+		uint8_t remains = can.send(std_id, CanTxData, len);
+
+		if (len == 0) return;
+
+		CanTxHeader.Identifier = std_id;
+		CanTxHeader.DataLength = len << 16;
+
 		if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &CanTxHeader, CanTxData) != HAL_OK) {
 			Error_Handler();
 		}
@@ -654,6 +765,7 @@ void CAN_Send() {
 		if (remains == 0) break;
 	}
 }
+
 /* USER CODE END 4 */
 
 /**
@@ -687,3 +799,4 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+//

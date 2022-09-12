@@ -3,10 +3,10 @@
 let host = ''
 host = 'http://gs.local'
 
-const LAUNCHER_MODE = false
+const LAUNCHER_MODE = true
 
 const POLLING_FREQ = 1
-const MAX_PLOT_ELEMENT = 2000
+const MAX_PLOT_ELEMENT = 1000
 
 let remote_index = 0;
 let local_index = 0;
@@ -36,6 +36,8 @@ const command_format = {
       'P': { name: 'Pressure Alt', unit: 'm',   datatype: 'float' },
       'V': { name: 'Ascent rate',  unit: 'm/s', datatype: 'float' },
       'U': { name: 'Time',         unit: 's',   datatype: 'time' },
+      'D': { name: 'Date',       datatype: 'int' },
+      'T': { name: 'Time',       datatype: 'int' },
       'S': { name: 'Satellites', datatype: 'int' },
     }
   },
@@ -141,11 +143,11 @@ const command_format = {
   // },
 }
 
-const charts = [
+let charts = [
   {
     name: 'Launcher Location',
     local: LAUNCHER_MODE,
-    id: 'P',
+    id: LAUNCHER_MODE ? 'P' : 'n',
     x: 'O',
     y: ['A'],
     xLabel: 'Longitude [deg]',
@@ -154,21 +156,21 @@ const charts = [
   {
     name: 'Launcher Altitude',
     local: LAUNCHER_MODE,
-    id: 'P',
+    id: LAUNCHER_MODE ? 'P' : 'n',
     x: 't',
-    y: ['H'],
+    y: ['H', 'P'],
     xLabel: 't [s]',
     yLabel: 'Altitude [m]'
   },
   {
     name: 'Launcher Battery',
     local: LAUNCHER_MODE,
-    id: 'B',
+    id: LAUNCHER_MODE ? 'B' : 'l',
     x: 't',
-    y: ['P', 'C', 'D'],
+    y: LAUNCHER_MODE ? ['P'] : ['V'],
     xLabel: 't [s]',
     yLabel: 'Voltage [V]',
-    // yMin: 0,
+    // yMin: 6,
     // yMax: 15
   },
   {
@@ -181,6 +183,9 @@ const charts = [
     yLabel: 'RSSI [dBm]',
     yMax: 0,
   },
+];
+if (LAUNCHER_MODE) {
+  charts.concat([
   {
     name: 'GS Location',
     local: true,
@@ -201,7 +206,8 @@ const charts = [
     // yMin: 0,
     // yMax: 10,
   },
-]
+  ]);
+}
 
 function createCharts() {
   for (const chart of charts) {
@@ -219,6 +225,7 @@ function createCharts() {
           showLine: true,
           fill: false,
           pointRadius: 0,
+          lineTension: 0,
         }
       })
     }
@@ -295,10 +302,12 @@ function addHistory(command) {
               })
             }
           }
+          console.log('!!reduced!!', data.length);
           dataset.data = data;
         }
         const y = command.entries.find(
           entry => entry.type == dataset.entry_type).payload;
+        if (Math.abs(x) > 1E10 || Math.abs(y) > 1E10) return;
         dataset.data.push({x, y});
       })
       chart.chart.update();
@@ -368,10 +377,11 @@ function fetch(local) {
       lines.shift();
 
       const commands = lines.map(parseCommandHex);
+      // console.log(commands);
 
       commands.forEach((command, i) => {
-        console.log('command ' + ((local ? local_index : remote_index ) + i),
-                    command);
+        // console.log('command ' + ((local ? local_index : remote_index ) + i),
+        //             command);
         command.updated = true;
         command.date = new Date();
         command.local = local;
@@ -525,7 +535,7 @@ function parseCommandHex(line) {
 }
 
 function showTime(t) {
-  const ms = Math.floor(t * 1000) % 1000;
+  const ms = Math.floor(t * 100) % 100;
   const s = Math.floor(t) % 60;
   const m = Math.floor(t / 60) % 60;
   const h = Math.floor(t / 60 / 60) % 24;
@@ -533,7 +543,7 @@ function showTime(t) {
   return String(h) + ':'
     + String(m).padStart(2, '0') + ':'
     + String(s).padStart(2, '0') + '.'
-    + String(ms).padStart(4, '0');
+    + String(ms).padStart(2, '0');
 }
 
 window.addEventListener('load', main);

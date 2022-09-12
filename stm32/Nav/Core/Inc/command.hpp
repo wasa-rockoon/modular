@@ -12,10 +12,16 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <cmath>
 
-#define NUM_STREAMS 4
-#define MAX_ENTRIES 16
 
+#ifndef MAX_ENTRIES
+#define MAX_ENTRIES 8
+#endif
+
+#define BIN_TX_QUEUE_SIZE 2
+#define HEX_TX_QUEUE_SIZE 2
+#define CAN_TX_QUEUE_SIZE 2
 
 union Payload {
 	uint8_t bytes[4];
@@ -24,6 +30,7 @@ union Payload {
 	float float_;
 };
 
+const union Payload default_payload = { .uint = 0 };
 
 struct Entry {
     uint8_t type;
@@ -37,7 +44,7 @@ struct Entry {
 
 	uint8_t encode(uint8_t* buf) const;
 	uint8_t encodeHex(uint8_t* buf) const;
-	bool decode(const uint8_t* buf, uint8_t len);
+	uint8_t decode(const uint8_t* buf);
 	uint8_t decodeHex(const uint8_t* buf);
 };
 
@@ -48,50 +55,118 @@ struct Command {
 	uint8_t size;
 	Entry entries[MAX_ENTRIES];
 
+	Command();
+	Command(uint8_t id, uint8_t to, uint8_t from, uint8_t size);
+
 	void setHeader(Entry header);
 	Entry getHeader() const;
+
+	float get(uint8_t type, uint8_t index = 0, float default_ = std::nan("")) const;
+	bool get(uint8_t type, uint8_t index = 0) const;
+	bool get(uint8_t type, uint8_t index, union Payload& p) const;
+
+	void addTimestamp(uint32_t time);
+
+	Command& operator=(const Command& command);
 };
 
-
-class ReceivingCommand {
+template<uint8_t N>
+class Queue {
 public:
-	Command* command;
-	uint32_t std_id;
-	uint32_t recently_used;
+	Queue();
 
-	bool start(uint32_t std_id, Entry header, uint32_t time);
-	bool addEntry(Entry entry, uint32_t time);
-	void abort();
+	inline uint8_t size() const { return size_; };
+	inline const Command& first() const { return buf[read_ptr_]; };
+	inline const Command& last() const { return buf[(write_ptr_ - 1) % N]; };
 
-	bool isFree();
+//	bool push(Command& command);
+//	bool push();
+//	bool pop(Command& command);
+//	bool pop();
+//
+	bool push(Command& command) {
+		if (size_ == N) return false;
+
+		buf[write_ptr_] = command;
+
+		return push();
+	}
+	bool push() {
+		if (size_ == N) return false;
+
+		write_ptr_++;
+		if (write_ptr_ >= N) write_ptr_ = 0;
+		size_++;
+
+		return true;
+	}
+	bool pop(Command& command) {
+		if (size_ == 0) return false;
+
+		command = first();
+
+		return pop();
+	}
+	bool pop() {
+		if (size_ == 0) return false;
+
+		read_ptr_++;
+		if (read_ptr_ >= N) read_ptr_ = 0;
+		size_--;
+
+		return true;
+	}
 
 private:
-	uint8_t count;
+	Command buf[N];
+	uint8_t size_;
+	uint8_t read_ptr_;
+	uint8_t write_ptr_;
 };
 
 
-class HexChannel {
-
-};
-
-class CANChannel {
+template<uint8_t TXQ>
+class Channel {
 public:
-	Command tx;
+	Queue<TXQ> tx;
 	Command rx;
 
+	Channel();
+
+	inline void cancelSending() { sending_ = -1; tx.pop(); };
+	inline void cancelReceiving() { receiving_ = -1; }
+
+	inline bool isReceiving() { return receiving_ != -1; };
+	inline bool isSending() { return tx.size() > 0; };
+
+protected:
+	int8_t receiving_;
+	int8_t sending_;
+};
+
+class BinaryChannel: public Channel<BIN_TX_QUEUE_SIZE> {
+
+};
+
+class HexChannel: public Channel<HEX_TX_QUEUE_SIZE> {
+public:
+	HexChannel();
+
+	bool receive(const uint8_t* data, uint8_t len);
+
+	uint8_t send(uint8_t* data, uint8_t& len);
+private:
+	uint8_t rx_buf_[12];
+	uint8_t rx_buf_count_;
+};
+
+class CANChannel: public Channel<CAN_TX_QUEUE_SIZE> {
+public:
 	CANChannel();
 
-	bool receive(uint8_t std_id, const uint8_t* data, uint8_t len);
+	bool receive(uint16_t std_id, const uint8_t* data, uint8_t len);
 
-	uint8_t send(uint8_t& std_id, uint8_t* data, uint8_t& len);
-	void cancelSending();
-
-	bool isReceiving();
-	bool isSending();
-
-private:
-	int8_t receiving;
-	int8_t sending;
+	uint8_t send(uint16_t& std_id, uint8_t* data, uint8_t& len);
 };
 
 
