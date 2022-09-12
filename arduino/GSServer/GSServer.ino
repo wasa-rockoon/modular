@@ -133,7 +133,7 @@ void loop() {
     position.entries[0].set('O', (float)gps.location.lng());
     position.entries[1].set('A', (float)gps.location.lat());
     position.entries[2].set('H', (float)gps.altitude.meters());
-    position.entries[3].set('T', (uint32_t)(epoch));
+    position.entries[3].set('U', (uint32_t)(epoch));
 
     can_channel.tx.push(position);
     sendCAN();
@@ -201,7 +201,10 @@ void onCANReceive(int packetSize) {
 
   for (int n = 0; n < len; n++) {
     data[n] = CAN.read();
+    /* Serial.print(data[n], HEX); */
   }
+
+  /* Serial.println(); */
 
   if (can_channel.receive(id, data, len)) {
     addReceivedCommand(can_channel.rx);

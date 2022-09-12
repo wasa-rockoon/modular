@@ -47,15 +47,16 @@ uint8_t Entry::encode(uint8_t* buf) const {
 }
 
 bool Entry::decode(const uint8_t* buf, uint8_t len) {
-	type = buf[0] & 0b01111111;
-	if (len == 5 && !(buf[0] & 0b10000000)) {
-		for (int i = 0; i < 4; i++) payload.bytes[i] = buf[1 + i];
-		return true;
-	}
-	else if (len == 1 && (buf[0] & 0b10000000)) {
-		return true;
-	}
-	else return false;
+    type = buf[0] & 0b01111111;
+    if (len == 5 && !(buf[0] & 0b10000000)) {
+        for (int i = 0; i < 4; i++) payload.bytes[i] = buf[1 + i];
+        return true;
+    }
+    else if (len == 1 && (buf[0] & 0b10000000)) {
+        payload.uint = 0;
+        return true;
+    }
+    else return false;
 }
 
 uint8_t Entry::encodeHex(uint8_t* buf) const {
@@ -101,9 +102,9 @@ uint8_t Entry::decodeHex(const uint8_t* buf) {
 
     type = data[0] & 0b01111111;
 
-    if (data[0] & 0b1000000) {
+    if (data[0] & 0b10000000) {
+    	payload.uint = 0;
     	return 2;
-    	payload.int_ = 0;
     }
     else {
 		for (int i = 1; i < 5; i++) {

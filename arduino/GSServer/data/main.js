@@ -20,28 +20,41 @@ const command_format = {
   'B': {
     name: 'Battery',
     entries: {
-      'P': { name: 'Vpp', unit: 'V', datatype: 'float', normal: 9.00 },
-      'C': { name: 'Vcc', unit: 'V', datatype: 'float', normal: 5.00 },
-      'D': { name: 'Vdd', unit: 'V', datatype: 'float', normal: 3.30 },
+      'P': { name: 'Vpp', unit: 'V', datatype: 'float' },
+      'C': { name: 'Vcc', unit: 'V', datatype: 'float' },
+      'D': { name: 'Vdd', unit: 'V', datatype: 'float' },
       'c': { name: 'Vcc', unit: 'A', datatype: 'float' },
       'd': { name: 'Vdd', unit: 'A', datatype: 'float' },
     }
   },
   'P': {
-    name: 'GPS',
+    name: 'Position',
     entries: {
-      'O': { name: 'Longitude', unit: '°', datatype: 'float' },
-      'A': { name: 'Latitude',  unit: '°', datatype: 'float' },
-      'H': { name: 'Altitude',  unit: 'm', datatype: 'float' },
-      'T': { name: 'Time',      unit: 's', datatype: 'time' },
+      'O': { name: 'Longitude',    unit: '°',   datatype: 'float' },
+      'A': { name: 'Latitude',     unit: '°',   datatype: 'float' },
+      'H': { name: 'GPS Alt',      unit: 'm',   datatype: 'float' },
+      'P': { name: 'Pressure Alt', unit: 'm',   datatype: 'float' },
+      'V': { name: 'Ascent rate',  unit: 'm/s', datatype: 'float' },
+      'U': { name: 'Time',         unit: 's',   datatype: 'time' },
+      'S': { name: 'Satellites', datatype: 'int' },
     }
   },
+  'E': {
+    name: 'Environment',
+    entries: {
+      'P': { name: 'Pressure',     unit: 'Pa',  datatype: 'float' },
+      'T': { name: 'Temperature',  unit: '℃',  datatype: 'float' },
+      'M': { name: 'Humidity',     unit: 'RH%', datatype: 'float' },
+    }
+  },
+
+
   'S': {
     name: 'LoRa TX',
     entries: {
       'C': { name: 'Code', datatype: 'int' },
-      'O': { name: 'OK', datatype: 'uint' },
-      'E': { name: 'NG', datatype: 'uint' },
+      'O': { name: 'OK',   datatype: 'uint' },
+      'N': { name: 'NG',   datatype: 'uint' },
     }
   },
   'R': {
@@ -51,7 +64,35 @@ const command_format = {
       'C': { name: 'Count', datatype: 'uint' },
     }
   },
-
+  'A': {
+    name: 'Attitude',
+    entries: {
+      'Q': { name: 'Quaternion',
+             datatype: 'float',
+             index: ['x', 'y', 'z', 'w']
+           },
+      'A': { name: 'Accel',
+             unit: 'm/s^2',
+             datatype: 'float',
+             index: ['x', 'y', 'z']
+           },
+    }
+  },
+  'I': {
+    name: 'Igniter',
+    entries: {
+      'V': { name: 'Battery',    unit: 'V', datatype: 'float' },
+      'C': { name: 'Current',    unit: 'A', datatype: 'float' },
+      'R': { name: 'Resistance', unit: 'Ω', datatype: 'float' },
+    }
+  },
+  'T': {
+    name: 'Temperature',
+    entries: {
+      'I': { name: 'Igniter', unit: '℃', datatype: 'float' },
+      'A': { name: 'Ambient', unit: '℃', datatype: 'float' },
+    }
+  },
   // Telemetry and Command
   'n': {
     name: 'Navigation',
@@ -72,29 +113,32 @@ const command_format = {
       'L': { name: 'Mode', payload: 'Launch' },
     }
   },
+  'l': {
+    name: 'Launcher',
+    entries: {
+      'V': { name: 'Battery', unit: 'V', datatype: 'float', min: 7.0 },
+    }
+  },
   's': {
     name: 'Settings',
     entries: {
       'I': { name: 'Min Launch Alt', unit: 'm', datatype: 'float' },
       'S': { name: 'Std Launch Alt', unit: 'm', datatype: 'float' },
       'A': { name: 'Max Launch Alt', unit: 'm', datatype: 'float' },
-      'Q': { name: 'QNH', unit: 'hPa', datatype: 'float' },
+      'Q': { name: 'QNH', unit: 'Pa', datatype: 'float' },
     }
   },
 
-  // Command
-
-
-  'Sample': {
-    name: 'Sample',
-    entries: {
-      'P': { name: 'Vpp', unit: 'V', datatype: 'float', normal: 9.0 },
-      'C': { name: 'Vcc', unit: 'V', datatype: 'float', normal: 5.0 },
-      'D': { name: 'Vdd', unit: 'V', datatype: 'float', normal: 3.3 },
-      'c': { name: 'Vcc', unit: 'A', datatype: 'float', },
-      'd': { name: 'Vdd', unit: 'A', datatype: 'float', },
-    }
-  },
+  // 'Sample': {
+  //   name: 'Sample',
+  //   entries: {
+  //     'P': { name: 'Vpp', unit: 'V', datatype: 'float', normal: 9.0 },
+  //     'C': { name: 'Vcc', unit: 'V', datatype: 'float', normal: 5.0 },
+  //     'D': { name: 'Vdd', unit: 'V', datatype: 'float', normal: 3.3 },
+  //     'c': { name: 'Vcc', unit: 'A', datatype: 'float', },
+  //     'd': { name: 'Vdd', unit: 'A', datatype: 'float', },
+  //   }
+  // },
 }
 
 const charts = [
@@ -113,7 +157,7 @@ const charts = [
     id: 'P',
     x: 't',
     y: ['H'],
-    xLabel: 't [ms]',
+    xLabel: 't [s]',
     yLabel: 'Altitude [m]'
   },
   {
@@ -122,7 +166,7 @@ const charts = [
     id: 'B',
     x: 't',
     y: ['P', 'C', 'D'],
-    xLabel: 't [ms]',
+    xLabel: 't [s]',
     yLabel: 'Voltage [V]',
     // yMin: 0,
     // yMax: 15
@@ -133,8 +177,8 @@ const charts = [
     id: 'R',
     x: 't',
     y: ['R'],
-    xLabel: 't [ms]',
-    yLabel: 'RSSI [V]',
+    xLabel: 't [s]',
+    yLabel: 'RSSI [dBm]',
     yMax: 0,
   },
   {
@@ -152,7 +196,7 @@ const charts = [
     id: 'B',
     x: 't',
     y: ['P', 'C', 'D'],
-    xLabel: 't [ms]',
+    xLabel: 't [s]',
     yLabel: 'Voltage [V]',
     // yMin: 0,
     // yMax: 10,
@@ -272,16 +316,16 @@ function main() {
 
   $('#connection-error').hide();
 
-  let sample_format = command_format['Sample'];
-  let sample = { name: sample_format.name, id: 'S', to: 'G', from: 'G',
-                 size: 5, entries: [], t: 1234567};
-  for (let k in sample_format.entries) {
-    let entry = {};
-    Object.assign(entry, sample_format.entries[k]);
-    entry.payload = Math.random();
-    sample.entries.push(entry)
-  }
-  console.log(sample);
+  // let sample_format = command_format['Sample'];
+  // let sample = { name: sample_format.name, id: 'S', to: 'G', from: 'G',
+  //                size: 5, entries: [], t: 1234567};
+  // for (let k in sample_format.entries) {
+  //   let entry = {};
+  //   Object.assign(entry, sample_format.entries[k]);
+  //   entry.payload = Math.random();
+  //   sample.entries.push(entry)
+  // }
+  // console.log(sample);
 
   createCharts();
   render();
@@ -371,7 +415,7 @@ function commandItem(command) {
             <thead>
                <tr>
                  <th>${command.name}</th>
-                 <th>${showMillis(command.t)}</th>
+                 <th>${showTime(command.t)}</th>
                </tr>
             </thead>
             ${command.entries.map(entryItem).join('\n')}
@@ -428,6 +472,9 @@ function parseCommandHex(line) {
 
     if (bytes[i] & 0b10000000) {
       i += 1;
+      if (entry.payload == undefined) {
+        entry.payload = 0;
+      }
     }
     else {
       let buf = new ArrayBuffer(4);
@@ -439,7 +486,7 @@ function parseCommandHex(line) {
       if (entry.payload != undefined) {
       }
       else if (type == 't') {
-        entry.payload = view.getUint32(0);
+        entry.payload = view.getUint32(0) / 1000.0;
         command.t = entry.payload;
       }
       else if (format && format.entries[type]) {
@@ -449,6 +496,9 @@ function parseCommandHex(line) {
           break;
         case 'int':
           entry.payload = view.getInt32(0);
+          break;
+        case 'uint':
+          entry.payload = view.getUint32(0);
           break;
         case 'time':
           entry.payload = new Date(view.getUint32(0) * 1000);
@@ -474,11 +524,11 @@ function parseCommandHex(line) {
   return command;
 }
 
-function showMillis(t) {
-  const ms = t % 1000;
-  const s = Math.floor(t / 1000) % 60;
-  const m = Math.floor(t / 1000 / 60) % 60;
-  const h = Math.floor(t / 1000 / 60 / 60) % 24;
+function showTime(t) {
+  const ms = Math.floor(t * 1000) % 1000;
+  const s = Math.floor(t) % 60;
+  const m = Math.floor(t / 60) % 60;
+  const h = Math.floor(t / 60 / 60) % 24;
 
   return String(h) + ':'
     + String(m).padStart(2, '0') + ':'
