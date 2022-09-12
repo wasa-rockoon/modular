@@ -12,12 +12,15 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <cmath>
 
 
-#define MAX_ENTRIES 12
+#ifndef MAX_ENTRIES
+#define MAX_ENTRIES 8
+#endif
 
-#define BIN_TX_QUEUE_SIZE 4
-#define HEX_TX_QUEUE_SIZE 4
+#define BIN_TX_QUEUE_SIZE 2
+#define HEX_TX_QUEUE_SIZE 2
 #define CAN_TX_QUEUE_SIZE 2
 
 union Payload {
@@ -27,6 +30,7 @@ union Payload {
 	float float_;
 };
 
+const union Payload default_payload = { .uint = 0 };
 
 struct Entry {
     uint8_t type;
@@ -40,7 +44,7 @@ struct Entry {
 
 	uint8_t encode(uint8_t* buf) const;
 	uint8_t encodeHex(uint8_t* buf) const;
-	bool decode(const uint8_t* buf, uint8_t len);
+	uint8_t decode(const uint8_t* buf);
 	uint8_t decodeHex(const uint8_t* buf);
 };
 
@@ -56,6 +60,12 @@ struct Command {
 
 	void setHeader(Entry header);
 	Entry getHeader() const;
+
+	float get(uint8_t type, uint8_t index = 0, float default_ = std::nan("")) const;
+	bool get(uint8_t type, uint8_t index = 0) const;
+	bool get(uint8_t type, uint8_t index, union Payload& p) const;
+
+	void addTimestamp(uint32_t time);
 
 	Command& operator=(const Command& command);
 };
@@ -124,6 +134,7 @@ public:
 	Channel();
 
 	inline void cancelSending() { sending_ = -1; tx.pop(); };
+	inline void cancelReceiving() { receiving_ = -1; }
 
 	inline bool isReceiving() { return receiving_ != -1; };
 	inline bool isSending() { return tx.size() > 0; };

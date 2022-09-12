@@ -30,7 +30,7 @@ uint8_t UART::read() {
 	uint8_t c = rx_buf_[rx_read_ptr_];
 
 	rx_read_ptr_++;
-	if (rx_read_ptr == RXBUFSIZE) rx_read_ptr = 0;
+	if (rx_read_ptr_ == RXBUFSIZE) rx_read_ptr_ = 0;
 
 	return c;
 }

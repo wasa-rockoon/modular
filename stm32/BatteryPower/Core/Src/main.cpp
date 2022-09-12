@@ -45,14 +45,14 @@
 
 #define VOLTAGE_FILTER_A 0.7
 #define CURRENT_FILTER_A 0.7
-#define VDD_CURRENT_OFFSET 0.4
+#define VDD_CURRENT_OFFSET 0.0
 #define VCC_CURRENT_OFFSET 0.0
-#define VPP_FIX (8.08 / 8.20)
-#define VCC_FIX (5.02 / 4.69)
-#define VDD_FIX (3.35 / 3.19)
+#define VPP_FIX (10.45 / 10.49)
+#define VCC_FIX (5.03 / 4.69)
+#define VDD_FIX (3.35 / 3.23)
 
 
-#define CAN_SEND_TIMEOUT_TICK 10
+#define CAN_SEND_TIMEOUT_TICK 50
 
 /* USER CODE END PD */
 
@@ -395,17 +395,56 @@ static void MX_CAN_Init(void)
   }
   /* USER CODE BEGIN CAN_Init 2 */
 
+
+  CAN_FilterTypeDef filter0;
+  uint32_t fId0   =  0x000 << 21;
+  uint32_t fMask0 = (0x100 << 21) | 0x4;
+  filter0.FilterIdHigh         = fId0 >> 16;
+  filter0.FilterIdLow          = fId0;
+  filter0.FilterMaskIdHigh     = fMask0 >> 16;
+  filter0.FilterMaskIdLow      = fMask0;
+  filter0.FilterScale          = CAN_FILTERSCALE_32BIT;
+  filter0.FilterFIFOAssignment = CAN_FILTER_FIFO0;
+  filter0.FilterBank           = 0;
+  filter0.FilterMode           = CAN_FILTERMODE_IDMASK;
+  filter0.FilterActivation     = ENABLE;
+  if (HAL_CAN_ConfigFilter(&hcan, &filter0) != HAL_OK)
+  {
+	Error_Handler();
+  }
+
+  CAN_FilterTypeDef filter1;
+  uint32_t fId1   =  0x100 << 21;
+  uint32_t fMask1 = (0x100 << 21) | 0x4;
+  filter1.FilterIdHigh         = fId1 >> 16;
+  filter1.FilterIdLow          = fId1;
+  filter1.FilterMaskIdHigh     = fMask1 >> 16;
+  filter1.FilterMaskIdLow      = fMask1;
+  filter1.FilterScale          = CAN_FILTERSCALE_32BIT;
+  filter1.FilterFIFOAssignment = CAN_FILTER_FIFO1;
+  filter1.FilterBank           = 2;
+  filter1.FilterMode           = CAN_FILTERMODE_IDMASK;
+  filter1.FilterActivation     = ENABLE;
+  if (HAL_CAN_ConfigFilter(&hcan, &filter1) != HAL_OK)
+  {
+	Error_Handler();
+  }
+
   if (HAL_CAN_Start(&hcan) != HAL_OK)
   {
     /* Start Error */
     Error_Handler();
   }
 
-  if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING | CAN_IT_TX_MAILBOX_EMPTY) != HAL_OK)
+  if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING | CAN_IT_RX_FIFO1_MSG_PENDING) != HAL_OK)
   {
     /* Notification Error */
     Error_Handler();
   }
+
+  CanTxHeader.RTR   = CAN_RTR_DATA;
+  CanTxHeader.IDE   = CAN_ID_STD;
+  CanTxHeader.TransmitGlobalTime = DISABLE;
 
   /* USER CODE END CAN_Init 2 */
 
@@ -561,33 +600,52 @@ static void MX_GPIO_Init(void)
 
 }
 
-/* USER CODE BEGIN 4 */
 
-void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
-	can_last_send_tick = HAL_GetTick();
-//	if (can.isSending()) CAN_Send();
+	/* Get RX message */
+	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &CanRxHeader, CanRxData) != HAL_OK) {
+		/* Reception Error */
+		Error_Handler();
+	}
+
+	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
+	}
 }
-void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan)
+void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
-	can_last_send_tick = HAL_GetTick();
-//	if (can.isSending()) CAN_Send();
+	/* Get RX message */
+	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO1, &CanRxHeader, CanRxData) != HAL_OK) {
+		/* Reception Error */
+		Error_Handler();
+	}
+
+	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
+	}
 }
-void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan)
-{
-	can_last_send_tick = HAL_GetTick();
-//	if (can.isSending()) CAN_Send();
-}
+
+
+/* USER CODE BEGIN 4 */
 
 void CAN_Send() {
 	while (true) {
 		uint16_t std_id;
 		uint8_t len;
 
-		while (can.isReceiving());
-
-
 		volatile uint32_t tick = HAL_GetTick();
+
+		while (can.isReceiving()) {
+			if (HAL_GetTick() - tick >= CAN_SEND_TIMEOUT_TICK) {
+				can.cancelReceiving();
+#ifdef DEBUG
+				printf("BUSY\n");
+#endif
+				return;
+			}
+		}
+
+		tick = HAL_GetTick();
+
 		while (
 //				HAL_GetTick() - tick <= 10 ||
 				HAL_CAN_GetTxMailboxesFreeLevel(&hcan) != 3) {
@@ -608,18 +666,16 @@ void CAN_Send() {
 		CanTxHeader.StdId = std_id;
 		CanTxHeader.DLC = len;
 
-	//	volatile unsigned tick = 0;
-	//	while (tick < 2400000) tick++;
 
 		if (HAL_CAN_AddTxMessage(&hcan, &CanTxHeader, CanTxData, &CanTxMailbox) != HAL_OK) {
 			Error_Handler();
 		}
 
-	#ifdef DEBUG
-		printf("Send %c(%x), %d: %c(%x) %x %x %x %x \n",
-				CanTxHeader.StdId, CanTxHeader.StdId, CanTxHeader.DLC,
-				CanTxData[0], CanTxData[0], CanTxData[1], CanTxData[2], CanTxData[3], CanTxData[4]);
-	#endif
+//	#ifdef DEBUG
+//		printf("Send %c(%x), %d: %c(%x) %x %x %x %x \n",
+//				CanTxHeader.StdId, CanTxHeader.StdId, CanTxHeader.DLC,
+//				CanTxData[0], CanTxData[0], CanTxData[1], CanTxData[2], CanTxData[3], CanTxData[4]);
+//	#endif
 
 		if (remains == 0) break;
 	}

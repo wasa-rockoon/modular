@@ -46,16 +46,17 @@ uint8_t Entry::encode(uint8_t* buf) const {
     }
 }
 
-bool Entry::decode(const uint8_t* buf, uint8_t len) {
+uint8_t Entry::decode(const uint8_t* buf) {
 	type = buf[0] & 0b01111111;
-	if (len == 5 && !(buf[0] & 0b10000000)) {
+
+	if ((buf[0] & 0b10000000)) {
+		payload.uint = 0;
+		return 1;
+	}
+	else {
 		for (int i = 0; i < 4; i++) payload.bytes[i] = buf[1 + i];
-		return true;
+		return 5;
 	}
-	else if (len == 1 && (buf[0] & 0b10000000)) {
-		return true;
-	}
-	else return false;
 }
 
 uint8_t Entry::encodeHex(uint8_t* buf) const {
@@ -102,8 +103,8 @@ uint8_t Entry::decodeHex(const uint8_t* buf) {
     type = data[0] & 0b01111111;
 
     if (data[0] & 0b1000000) {
+    	payload.uint = 0;
     	return 2;
-    	payload.int_ = 0;
     }
     else {
 		for (int i = 1; i < 5; i++) {
@@ -140,6 +141,35 @@ Entry Command::getHeader() const {
 	header.payload.bytes[2] = from;
 	header.payload.bytes[3] = size;
 	return header;
+}
+
+float Command::get(uint8_t type, uint8_t index, float dufault) const {
+	Payload p = { .float_ = 0.0 };
+	get(type, index, p);
+	return p.float_;
+}
+
+bool Command::get(uint8_t type, uint8_t index) const {
+	Payload p;
+	return get(type, index, p);
+}
+
+bool Command::get(uint8_t type, uint8_t index, union Payload& p) const {
+	for (int n = 0; n < size; n++) {
+		if (entries[n].type == type) {
+			if (index == 0) {
+				p = entries[n].payload;
+				return true;
+			}
+			else index--;
+		}
+	}
+	return false;
+}
+
+void Command::addTimestamp(uint32_t time) {
+	entries[size].set('t', time);
+	size++;
 }
 
 Command& Command::operator=(const Command& command) {
@@ -248,13 +278,15 @@ CANChannel::CANChannel(): Channel() {}
 bool CANChannel::receive(uint16_t std_id, const uint8_t* data, uint8_t len) {
 
 	Entry entry;
-	if (!entry.decode(data, len)) return false;
+	uint8_t decode_len = entry.decode(data);
+	if (len != decode_len) return false;
 
 	std_id &= 0x0ff;
 
 	// Start receiving_ new command
 	if (entry.type == 0) {
 		rx.setHeader(entry);
+		if (rx.size > MAX_ENTRIES) rx.size = MAX_ENTRIES;
 		receiving_ = 0;
 	}
 	// Cancel receiving_

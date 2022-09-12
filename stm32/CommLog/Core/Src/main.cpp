@@ -16,6 +16,9 @@
   *
   ******************************************************************************
   */
+#ifdef DEBUG
+#define MAX_ENTRIES 8
+#endif
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -24,8 +27,10 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <cstdio>
+#include <string.h>
 #include "command.hpp"
 #include "uart.hpp"
+#include "es920lr.hpp"
 
 /* USER CODE END Includes */
 
@@ -44,18 +49,36 @@
 #define GS
 #endif
 
-#define CAN_SEND_TIMEOUT_TICK 10
+#define LORA_SETUP
+
 #define SD_SYNC_TICK 100
 
-const uint8_t PANID[] = "0110";
+const char PANID[] = "0110";
 
 #ifdef LAUNCHER
-const uint8_t DEST_ADDR[] = "0002";
+const char OWN_ID[] = "0000";
+const char DEST_ADDR[] = "FFFF";
+#define SEND_IFREQ 13
 #endif
 #ifdef GS
-const uint8_t DEST_ADDR[] = "0000";
+const char OWN_ID[] = "0001";
+//const char OWN_ID[] = "0002";
+const char DEST_ADDR[] = "0000";
+#define SEND_IFREQ 17
 #endif
 
+//#define LORA_BAUD 115200
+#define LORA_BAUD 38400
+
+
+#define CAN_SEND_TIMEOUT_TICK 10
+
+#define LORA_TIMEOUT_TICK 30000
+
+#define UPLINK_WAIT_TICK 5000
+#define SETTING_CONFIRM_TICK 1000
+
+#define BLINK_TICK 500
 
 /* USER CODE END PD */
 
@@ -97,6 +120,7 @@ static void MX_TIM14_Init(void);
 /* USER CODE BEGIN PFP */
 
 extern "C" void initialise_monitor_handles(void);
+void Blink();
 void CAN_Send();
 
 /* USER CODE END PFP */
@@ -108,7 +132,7 @@ CANChannel can;
 HexChannel sd;
 
 UART twelite(huart1);
-UART lora(huart2);
+ES920LR lora(huart2);
 
 CAN_TxHeaderTypeDef   CanTxHeader;
 CAN_RxHeaderTypeDef   CanRxHeader;
@@ -118,6 +142,7 @@ uint32_t              CanTxMailbox;
 
 uint32_t can_last_send_tick = 0;
 uint32_t sd_last_sync_tick = 0;
+uint32_t lora_last_send_tick = 0;
 
 FATFS fs;  // file system
 FIL fil; // File
@@ -126,82 +151,127 @@ FRESULT fresult;  // result
 UINT br, bw;  // File read/write count
 
 bool file_opened = false;
-bool lora_initialized = false;
 
-uint32_t count = 0;
+uint32_t blink_tick = 0;
 
-bool lora_sending = false;
+#ifdef LAUNCHER
 
+Command tlm_nav('n', 'L', 0, 0);
+Command tlm_mode('m', 'L', 0, 0);
+Command tlm_launcher('l', 'L', 0, 0);
+Command tlm_settings('s', 'L', 0, 0);
 
-void TWE_Init() {
+enum class TlmState {
+	Init,
+	SendingNav,
+	SendingMode,
+	SendingLauncher,
+	WaitingUplink,
+	ConfirmingSettings,
+	SendingSettings,
+};
 
-	HAL_GPIO_WritePin(TWE_NRST_GPIO_Port, TWE_NRST_Pin, GPIO_PIN_RESET);
-	HAL_Delay(100);
-	HAL_GPIO_WritePin(TWE_NRST_GPIO_Port, TWE_NRST_Pin, GPIO_PIN_SET);
+TlmState tlm_state = TlmState::Init;
+
+uint32_t tlm_state_tick = 0;
+
+#endif
+
+#ifdef GS
+
+Command command_mode;
+Command command_settings;
+
+bool send_settings = false;
+
+#endif
+
+#ifdef LAUNCHER
+void ChangeState(TlmState new_state) {
+	tlm_state = new_state;
+	tlm_state_tick = HAL_GetTick();
+#ifdef DEBUG
+	switch (new_state) {
+	case TlmState::Init:
+		printf("Init State\n");
+		break;
+	case TlmState::SendingNav:
+		printf("Sending Nav Tlm\n");
+		break;
+	case TlmState::SendingMode:
+		printf("Sending Mode Tlm\n");
+		break;
+	case TlmState::SendingLauncher:
+		printf("Sending Launcher Tlm\n");
+		break;
+	case TlmState::WaitingUplink:
+		printf("Waiting Uplink\n");
+		break;
+	case TlmState::ConfirmingSettings:
+		printf("Confirming Settings\n");
+		break;
+	case TlmState::SendingSettings:
+		printf("Sending Settings Tlm\n");
+		break;
+	}
+#endif
+}
+#endif
+
+void LoRa_Setup() {
+	lora.begin(true);
+
+	lora.config('b', "3", 1); // Bandwidth
+	lora.config('c', "12", 2); // Spreading factor
+	lora.config('d', "3", 1); // channel
+	lora.config('e', PANID, 4); // PAN ID
+	lora.config('f', OWN_ID, 4); // Own ID
+	lora.config('g', DEST_ADDR, 4); // Destination ID
+	lora.config('n', "2", 1); // Transfer mode
+	lora.config('o', "1", 1); // Receive ID
+	lora.config('p', "1", 1); // RSSI
+	lora.config('u', "13", 2); // Power
+	lora.config('A', "2", 1); // Payload format
+#ifdef LAUNCHER
+	lora.config('a', "1", 1); // Node
+	lora.config('l', "2", 1); // Ack
+#endif
+#ifdef GS
+	lora.config('a', "2", 1); // Node
+	lora.config('l', "1", 1); // Ack
+#endif
+	lora.config('w', "", 0); // save
 }
 
-void LoRa_Init() {
+bool SD_Init() {
+	fresult = f_mount(&fs, "/", 1);
 
-	HAL_Delay(100);
+	// Check free space
+	FATFS *pfs;
+	DWORD fre_clust;
+	f_getfree("", &fre_clust, &pfs);
 
-	HAL_GPIO_WritePin(LORA_NRST_GPIO_Port, LORA_NRST_Pin, GPIO_PIN_RESET);
-	HAL_Delay(100);
-	HAL_GPIO_WritePin(LORA_NRST_GPIO_Port, LORA_NRST_Pin, GPIO_PIN_SET);
+	fresult = f_open(&fil, "lists.txt", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
+	uint32_t file_id = f_size(&fil);
+	for (unsigned n = 0; n <= file_id; n++) f_putc('1', &fil);
+	fresult = f_close(&fil);
 
-	HAL_Delay(2000);
+	char file_name[16];
+	sprintf(file_name, "log%05u.txt", (unsigned)file_id);
 
-	uint8_t* buf;
-	uint32_t len = lora.read(buf);
+	/* Open file to write/ create a file if it doesn't exist */
+	fresult = f_open(&fil, file_name, FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
 
-	if (len > 0) {
 #ifdef DEBUG
-		printf("LoRa: %.*s\n", len, buf);
-#endif
-	}
-
-	HAL_UART_Receive_DMA(&huart2, lora.rx_buf(), RXBUFSIZE);
-
-	uint8_t com_p[] = "2\x0d\x0a";
-	HAL_UART_Transmit_DMA(&huart2, com_p, 3);
-
-	HAL_Delay(100);
-
-	uint8_t com_s[] = "z\x0d\x0a";
-	HAL_UART_Transmit_DMA(&huart2, com_s, 3);
-
-	HAL_Delay(100);
-	len = lora.read(buf);
-
-	if (len > 0) {
-#ifdef DEBUG
-		printf("LoRa: %.*s\n", len, buf);
-#endif
-	}
-
-	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
-
-	HAL_UART_Receive_DMA(&huart2, lora.rx_buf(), RXBUFSIZE);
-
-	lora_initialized = true;
-}
-
-
-void LoRa_SendFrame(uint8_t* data, uint8_t len) {
-#ifdef DEBUG
-		printf("Send %s\n", data);
+	// uint32_t total = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
+	//  uint	32_t free_space = (uint32_t)(fre_clust * pfs->csize * 0.5);
+	//
+	//  printf("File opened: %s, total: %d, free: %d, %d\n",
+	//		  file_name, total, free_space, fresult);
+	printf("File: %s, %d\n", file_name, fresult);
 #endif
 
-	lora_sending = true;
-
-	uint8_t header[59];
-	header[0] = len + 8;
-	for (int i = 0; i < 4; i++) header[i + 1] = PANID[i];
-	for (int i = 0; i < 4; i++) header[i + 5] = DEST_ADDR[i];
-	for (int i = 0; i < len; i++) header[i + 9] = data[i];
-//	*(uint32_t*)(header + 1) = PANID;
-//	*(uint32_t*)(header + 5) = DEST_ADDR;
-	HAL_UART_Transmit_DMA(&huart2, header, 9 + len);
-//	HAL_UART_Transmit_DMA(&huart2, data, len);
+	return fresult == FR_OK;
 }
 
 
@@ -214,62 +284,52 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     }
 }
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
-{
-	/* Get RX message */
-	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &CanRxHeader, CanRxData) != HAL_OK) {
-		/* Reception Error */
-		Error_Handler();
+void CAN_Received() {
+
+	switch (can.rx.id) {
+#ifdef LAUNCHER
+	case 'B':
+		tlm_launcher.entries[0].set('V', can.rx.get('P', 0, 0.0f));
+		tlm_launcher.size = 1;
+		break;
+	case 'P':
+		tlm_nav.entries[0].set('O', can.rx.get('O', 0, 0.0f));
+		tlm_nav.entries[1].set('A', can.rx.get('A', 0, 0.0f));
+		tlm_nav.entries[2].set('H', can.rx.get('H', 0, 0.0f));
+		tlm_nav.entries[3].set('P', can.rx.get('P', 0, 0.0f));
+		tlm_nav.size = 4;
+		break;
+	case 'M':
+		tlm_mode = can.rx;
+		tlm_mode.id = 'm';
+		break;
+	case 'S':
+		tlm_settings.entries[0].set('I', can.rx.get('I', 0,
+				tlm_settings.entries[0].payload.float_));
+		tlm_settings.entries[1].set('S', can.rx.get('S', 0,
+				tlm_settings.entries[1].payload.float_));
+		tlm_settings.entries[2].set('A', can.rx.get('A', 0,
+				tlm_settings.entries[2].payload.float_));
+		tlm_settings.entries[3].set('Q', can.rx.get('Q', 0,
+				tlm_settings.entries[3].payload.float_));
+		tlm_settings.size = 4;
+		break;
+#endif
+#ifdef GS
+	case 'm':
+		command_mode = can.rx;
+		break;
+	case 's':
+		command_settings = can.rx;
+		send_settings = true;
+		break;
+#endif
 	}
 
-	count++;
 
-//	__HAL_UNLOCK(hcan);
-
-//#ifdef DEBUG
-////		printf("%c(%x), %d: %c(%x) %x %x %x %x \n",
-////				CanRxHeader.StdId, CanRxHeader.StdId, CanRxHeader.DLC,
-////				CanRxData[0], CanRxData[0], CanRxData[1], CanRxData[2], CanRxData[3], CanRxData[4]);
-//
-//	printf("%c\n", CanRxData[0]);
-//#endif
-//
-	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
-
-		if (file_opened) sd.tx.push(can.rx);
-
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-
-		count++;
-
-		if (lora_initialized && !lora_sending && count % 20 == 0) {
-			uint8_t buf[] = "ABC";
-			LoRa_SendFrame(buf, 3);
-		}
-	}
-}
-void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
-{
-	/* Get RX message */
-	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO1, &CanRxHeader, CanRxData) != HAL_OK) {
-		/* Reception Error */
-		Error_Handler();
-	}
-
-	count++;
-
-	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
-
-		if (file_opened) sd.tx.push(can.rx);
-
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-
-		count++;
-
-		if (lora_initialized  && !lora_sending && count % 20 == 0) {
-			uint8_t buf[] = "CDE";
-			LoRa_SendFrame(buf, 3);
-		}
+	if (file_opened) {
+		can.rx.addTimestamp(HAL_GetTick());
+		sd.tx.push(can.rx);
 	}
 }
 
@@ -328,40 +388,21 @@ int main(void)
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
 
-  fresult = f_mount(&fs, "/", 1);
+  file_opened = SD_Init();
 
-  // Check free space
-  FATFS *pfs;
-  DWORD fre_clust;
-  f_getfree("", &fre_clust, &pfs);
 
-  fresult = f_open(&fil, "lists.txt", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
-  uint32_t file_id = f_size(&fil);
-  for (unsigned n = 0; n <= file_id; n++) f_putc('1', &fil);
-  fresult = f_close(&fil);
+  // Reset TWELITE
+  HAL_GPIO_WritePin(TWE_NRST_GPIO_Port, TWE_NRST_Pin, GPIO_PIN_RESET);
+  HAL_Delay(100);
+  HAL_GPIO_WritePin(TWE_NRST_GPIO_Port, TWE_NRST_Pin, GPIO_PIN_SET);
 
-  char file_name[16];
-  sprintf(file_name, "log%05u.txt", (unsigned)file_id);
 
-  	/* Open file to write/ create a file if it doesn't exist */
-  fresult = f_open(&fil, file_name, FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
-
-  if (fresult == FR_OK) file_opened = true;
-
-#ifdef DEBUG
-//  uint32_t total = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
-//  uint32_t free_space = (uint32_t)(fre_clust * pfs->csize * 0.5);
-//
-//  printf("File opened: %s, total: %d, free: %d, %d\n",
-//		  file_name, total, free_space, fresult);
-  printf("File opened: %s, %d\n", file_name, fresult);
+#ifdef LORA_SETUP
+  LoRa_Setup();
+#else
+  lora.begin();
 #endif
-
-
-  TWE_Init();
-
-  LoRa_Init();
-
+  lora.startOperation();
 
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 
@@ -373,18 +414,136 @@ int main(void)
   {
 //	  printf("%d %d %d\n", count0, count1, count0 + count1);
 
-	  uint8_t* buf;
-	  uint32_t len = lora.read(buf);
+#ifdef LAUNCHER
+	  if (tlm_state == TlmState::Init && lora.readyToSend()) {
+		  lora.send(PANID, DEST_ADDR, tlm_nav);
+		  lora_last_send_tick = HAL_GetTick();
 
-	  if (len > 0) {
-#ifdef DEBUG
-		  printf("LoRa: %.*s\n", len, buf);
-#endif
-		  lora_sending = false;
-
-//		  HAL_UART_Receive_DMA(&huart2, lora.rx_buf(), RXBUFSIZE);
+		  ChangeState(TlmState::SendingNav);
 	  }
+	  else if (tlm_state == TlmState::WaitingUplink &&
+			  HAL_GetTick() - tlm_state_tick >= UPLINK_WAIT_TICK) {
+		  ChangeState(tlm_state = TlmState::Init);
+	  }
+	  else if (tlm_state == TlmState::ConfirmingSettings &&
+			  HAL_GetTick() - tlm_state_tick >= SETTING_CONFIRM_TICK) {
+		  lora.send(PANID, DEST_ADDR, tlm_settings);
+		  lora_last_send_tick = HAL_GetTick();
 
+		  ChangeState(TlmState::SendingSettings);
+	  }
+#endif
+
+	  if (lora.isSending()) {
+		  int8_t code = lora.getResponse();
+
+		  // LoRa complete sending
+		  if (code >= 0) {
+			  Blink();
+#ifdef DEBUG
+			  printf("LoRa Sent: %d\n", code);
+#endif
+
+#ifdef LAUNCHER
+			  if (lora.readyToSend()) {
+				  switch (tlm_state) {
+				  case TlmState::SendingNav:
+					  lora.send(PANID, DEST_ADDR, tlm_mode);
+					  lora_last_send_tick = HAL_GetTick();
+
+					  ChangeState(TlmState::SendingMode);
+					  break;
+				  case TlmState::SendingMode:
+					  lora.send(PANID, DEST_ADDR, tlm_launcher);
+					  lora_last_send_tick = HAL_GetTick();
+
+					  ChangeState(TlmState::SendingLauncher);
+					  break;
+				  case TlmState::SendingLauncher:
+					  ChangeState(TlmState::WaitingUplink);
+					  break;
+				  case TlmState::SendingSettings:
+					  ChangeState(TlmState::Init);
+					  break;
+				  default:
+					  ChangeState(TlmState::Init);
+				  }
+			  }
+			  else ChangeState(TlmState::Init);
+#endif
+
+			  Command tlm('S', 0, 0, 3);
+			  tlm.entries[0].set('C', (int32_t)code);
+			  tlm.entries[1].set('O', (uint32_t)lora.tx_ok_count);
+			  tlm.entries[2].set('N', (uint32_t)lora.tx_ng_count);
+
+			  can.tx.push(tlm);
+			  CAN_Send();
+
+			  if (file_opened) {
+				  tlm.addTimestamp(HAL_GetTick());
+				  sd.tx.push(tlm);
+			  }
+		  }
+		  else if (HAL_GetTick() - lora_last_send_tick >= LORA_TIMEOUT_TICK) {
+#ifdef DEBUG
+			  printf("LoRa Reset");
+#endif
+			  lora.begin();
+		  }
+	  }
+	  else if (lora.inOperation()) {
+		  Command rx;
+		  bool received = lora.receive(rx);
+
+		  // LoRa received
+		  if (received) {
+			  Blink();
+#ifdef DEBUG
+			  printf("LoRa Received %d: %c (%d)\n", lora.rssi, rx.id, rx.size);
+#endif
+#ifdef LAUNCHER
+			  if (tlm_state == TlmState::WaitingUplink) {
+				  if (rx.id == 's') {
+					  ChangeState(TlmState::ConfirmingSettings);
+				  }
+				  else {
+					  ChangeState(TlmState::Init);
+				  }
+			  }
+
+			  rx.from = 'G';
+#endif
+#ifdef GS
+			  if (rx.id == 'l') {
+				  if (send_settings) {
+					  lora.send(PANID, DEST_ADDR, command_settings);
+					  send_settings = false;
+				  }
+				  else {
+					  lora.send(PANID, DEST_ADDR, command_mode);
+				  }
+
+				  lora_last_send_tick = HAL_GetTick();
+			  }
+			  rx.from = 'L';
+#endif
+			  can.tx.push(rx);
+
+			  Command tlm('R', 0, 0, 2);
+			  tlm.entries[0].set('R', (int32_t)lora.rssi);
+			  tlm.entries[1].set('C', (uint32_t)lora.rx_count);
+			  can.tx.push(tlm);
+			  CAN_Send();
+
+			  if (file_opened) {
+				  rx.addTimestamp(HAL_GetTick());
+				  tlm.addTimestamp(HAL_GetTick());
+				  sd.tx.push(rx);
+				  sd.tx.push(tlm);
+			  }
+		  }
+	  }
 
 	  if (sd.isSending()) {
 		  uint8_t buf[14];
@@ -412,6 +571,11 @@ int main(void)
 #ifdef DEBUG
 		  printf("TIMEOUT\n");
 #endif
+	  }
+
+
+	  if (HAL_GetTick() - blink_tick > BLINK_TICK) {
+		  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 	  }
 
     /* USER CODE END WHILE */
@@ -540,7 +704,7 @@ static void MX_CAN_Init(void)
     Error_Handler();
   }
 
-  if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING | CAN_IT_RX_FIFO1_MSG_PENDING | CAN_IT_TX_MAILBOX_EMPTY) != HAL_OK)
+  if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING | CAN_IT_RX_FIFO1_MSG_PENDING) != HAL_OK)
   {
     /* Notification Error */
     Error_Handler();
@@ -716,7 +880,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 38400;
+  huart2.Init.BaudRate = LORA_BAUD;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -822,46 +986,80 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
-{
-	can_last_send_tick = HAL_GetTick();
-	if (can.isSending()) CAN_Send();
-}
-void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan)
-{
-	can_last_send_tick = HAL_GetTick();
-	if (can.isSending()) CAN_Send();
-}
-void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan)
-{
-	can_last_send_tick = HAL_GetTick();
-	if (can.isSending()) CAN_Send();
+void Blink() {
+	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+	blink_tick = HAL_GetTick();
 }
 
-void CAN_Send() {
-	uint16_t std_id;
-	uint8_t len;
-
-	while (can.isReceiving());
-
-	can.send(std_id, CanTxData, len);
-
-	if (len == 0) return;
-
-	CanTxHeader.StdId = std_id;
-	CanTxHeader.DLC = len;
-
-	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) != 3);
-
-	if (HAL_CAN_AddTxMessage(&hcan, &CanTxHeader, CanTxData, &CanTxMailbox) != HAL_OK) {
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
+{
+	/* Get RX message */
+	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &CanRxHeader, CanRxData) != HAL_OK) {
+		/* Reception Error */
 		Error_Handler();
 	}
-//
-//#ifdef DEBUG
-//	printf("Send %c(%x), %d: %c(%x) %x %x %x %x \n",
-//			CanTxHeader.StdId, CanTxHeader.StdId, CanTxHeader.DLC,
-//			CanTxData[0], CanTxData[0], CanTxData[1], CanTxData[2], CanTxData[3], CanTxData[4]);
-//#endif
+
+	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
+		CAN_Received();
+	}
+}
+void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
+{
+	/* Get RX message */
+	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO1, &CanRxHeader, CanRxData) != HAL_OK) {
+		/* Reception Error */
+		Error_Handler();
+	}
+
+	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
+		CAN_Received();
+	}
+}
+
+
+void CAN_Send() {
+	while (true) {
+		uint16_t std_id;
+		uint8_t len;
+
+		volatile uint32_t tick = HAL_GetTick();
+
+		while (can.isReceiving()) {
+			if (HAL_GetTick() - tick >= CAN_SEND_TIMEOUT_TICK) {
+				can.cancelReceiving();
+#ifdef DEBUG
+				printf("BUSY\n");
+#endif
+				return;
+			}
+		}
+
+		tick = HAL_GetTick();
+
+		while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) != 3) {
+			if (HAL_GetTick() - tick >= CAN_SEND_TIMEOUT_TICK) {
+				HAL_CAN_AbortTxRequest(&hcan, CanTxMailbox);
+				can.cancelSending();
+#ifdef DEBUG
+				printf("TIMEOUT\n");
+#endif
+				return;
+			}
+		}
+
+		uint8_t remains = can.send(std_id, CanTxData, len);
+
+		if (len == 0) return;
+
+		CanTxHeader.StdId = std_id;
+		CanTxHeader.DLC = len;
+
+		if (HAL_CAN_AddTxMessage(&hcan, &CanTxHeader, CanTxData, &CanTxMailbox) != HAL_OK) {
+			Error_Handler();
+		}
+
+		if (remains == 0) break;
+	}
 }
 
 

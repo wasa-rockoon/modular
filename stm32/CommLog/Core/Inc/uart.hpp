@@ -11,8 +11,7 @@
 #include "main.h"
 
 #define RXBUFSIZE 64
-#define TXBUFSIZE 5
-
+#define TXBUFSIZE 64
 
 class UART {
 public:
@@ -21,13 +20,14 @@ public:
 	bool rxIsEmpty();
 	uint32_t available();
 
+	uint8_t read();
 	uint32_t read(uint8_t*& buf);
 	void clear();
 
 	inline uint8_t* rx_buf() { return rx_buf_; }
 	inline uint8_t* tx_buf() { return tx_buf_; }
 
-private:
+protected:
 	UART_HandleTypeDef& huart_;
 
 	uint8_t rx_buf_[RXBUFSIZE];
