@@ -17,7 +17,7 @@ BMX055::BMX055(SPI_HandleTypeDef& spi,
 				Mag(Magnetometer(spi, mag_cs_port, mag_cs_pin)) {}
 
 
-uint8_t BMX055::begin() {
+bool BMX055::begin() {
 
     Accl.setRange(PM2G);
     HAL_Delay(100);
@@ -25,6 +25,7 @@ uint8_t BMX055::begin() {
     HAL_Delay(100);
     Accl.writeRegister(0x11, 0x00);
     HAL_Delay(100);
+
 
     Gyro.setRange(PM125DPS);
     HAL_Delay(100);
@@ -47,7 +48,14 @@ uint8_t BMX055::begin() {
     Mag.writeRegister(0x52, 0x0F);
     HAL_Delay(100);
 
-    return 1;
+	uint8_t accl_id = Accl.readRegister(0);
+	uint8_t gyro_id = Gyro.readRegister(0);
+	uint8_t mag_id = Mag.readRegister(0x40);
+
+	if (accl_id != 0b11111010 || gyro_id != 0x0F || mag_id != 0b00110010)
+		return false;
+
+    return true;
 }
 
 void BMX055::reset() {
@@ -60,26 +68,52 @@ void BMX055::reset() {
 Function::Function(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16_t cs_pin):
 		spi(spi), cs_port(cs_port), cs_pin(cs_pin) {}
 
+void Function::start() {
+	HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);
+//	HAL_Delay(1);
+}
+
+void Function::end() {
+//	HAL_Delay(1);
+	HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
+//	HAL_Delay(1);
+}
 
 void Function::writeRegister(uint8_t addr, uint8_t value) {
 	addr = addr & 0x7F;
 
-	HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);
+	start();
 	HAL_SPI_Transmit(&spi, &addr, 1, 100);
 	HAL_SPI_Transmit(&spi, &value, 1, 100);
-	HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
+	end();
 }
 
 uint8_t Function::readRegister(uint8_t addr) {
 	addr = addr | 0x80;
 	uint8_t value;
 
-	HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);
+	start();
 	HAL_SPI_Transmit(&spi, &addr, 1, 100);
 	HAL_SPI_Receive(&spi, &value, 1, 100);
-	HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
+	end();
 
 	return value;
+}
+
+uint8_t Function::readRegisters(uint8_t addr, uint8_t* data, uint8_t len) {
+	addr = addr | 0x80;
+
+	start();
+	HAL_SPI_Transmit(&spi, &addr, 1, 100);
+
+	uint8_t received = 0;
+	for (int n = 0; n < len; n++) {
+		if (HAL_SPI_Receive(&spi, data + n, 1, 100) != HAL_OK) break;
+		received++;
+	}
+	end();
+
+	return received;
 }
 
 
@@ -105,16 +139,15 @@ void Accelerometer::setRange(AcclRange range) {
 }
 
 Vec3 Accelerometer::read() {
-    unsigned int data[6];
-    for (int i = 0; i < 6; i++) {
-    	data[i] = readRegister(2 + i);
-    }
+    uint8_t data[6];
+    readRegisters(2, data, 6);
+
     // Convert the data to 12-bits
-    int x = (data[1] << 4) + (data[0] >> 4);
+    int x = ((unsigned)data[1] << 4) + ((unsigned)data[0] >> 4);
     if (x > 2047) x -= 4096;
-    int y = (data[3] << 4) + (data[2] >> 4);
+    int y = ((unsigned)data[3] << 4) + ((unsigned)data[2] >> 4);
     if (y > 2047) y -= 4096;
-    int z = (data[5] << 4) + (data[4] >> 4);
+    int z = ((unsigned)data[5] << 4) + ((unsigned)data[4] >> 4);
     if (z > 2047) z -= 4096;
 
     return { x * factor, y * factor, z * factor };
@@ -126,16 +159,15 @@ Gyroscope::Gyroscope(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16_t cs_
 		Function(spi, cs_port, cs_pin) {}
 
 Vec3 Gyroscope::read() {
-    unsigned int data[6];
-    for (int i = 0; i < 6; i++) {
-    	data[i] = readRegister(2 + i);
-    }
+    uint8_t data[6];
+    readRegisters(2, data, 6);
+
     // Convert the data
-    int x = (data[1] << 8) + data[0];
+    int x = ((unsigned)data[1] << 8) + (unsigned)data[0];
     if (x > 32767) x -= 65536;
-    int y = (data[3] << 8) + data[2];
+    int y = ((unsigned)data[3] << 8) + (unsigned)data[2];
     if (y > 32767) y -= 65536;
-    int z = (data[5] << 8) + data[4];
+    int z = ((unsigned)data[5] << 8) + (unsigned)data[4];
     if (z > 32767) z -= 65536;
 
     return { x * factor, y * factor, z * factor };
@@ -166,16 +198,18 @@ Magnetometer::Magnetometer(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16
 		Function(spi, cs_port, cs_pin) {}
 
 Vec3 Magnetometer::read() {
+
+	uint8_t mag_id = readRegister(0x40);
+
     uint8_t data[6];
-    for (int i = 0; i < 6; i++) {
-    	data[i] = readRegister(0x42 + i);
-    }
+    readRegisters(0x42, data, 6);
+
     // Convert the data
-    int x = (data[1] << 5) + (data[0] >> 3);
+    int x = ((unsigned)data[1] << 5) + ((unsigned)data[0] >> 3);
     if (x > 4095) x -= 8192;
-    int y = (data[3] << 5) + (data[2] >> 3);
+    int y = ((unsigned)data[3] << 5) + ((unsigned)data[2] >> 3);
     if (y > 4095) y -= 8192;
-    int z = (data[5] << 7) + (data[4] >> 1);
+    int z = ((unsigned)data[5] << 7) + ((unsigned)data[4] >> 1);
     if (z > 16383) z -= 32768;
 
     return { (float)x / 16.0f - center.x, (float)y / 16.0f - center.y, (float)z / 16.0f - center.z };

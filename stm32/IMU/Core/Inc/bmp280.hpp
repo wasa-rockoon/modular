@@ -25,7 +25,7 @@
 #define INC_BMP280_HPP_
 
 #include <stdint.h>
-#include <stm32f0xx_hal.h>
+#include <stm32g4xx_hal.h>
 
 #define BMP280_CHIPID (0x58) /**< Default chip ID. */
 

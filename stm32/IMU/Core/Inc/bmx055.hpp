@@ -9,7 +9,7 @@
 #define INC_BMX055_HPP_
 
 #include <stdint.h>
-#include <stm32f0xx_hal.h>
+#include <stm32g4xx_hal.h>
 #include <algebra.hpp>
 
 enum AcclRange: uint8_t {
@@ -33,10 +33,11 @@ class Function {
 public:
 	Function(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16_t cs_pin);
 
-    uint8_t begin();
-
+    void start();
+    void end();
     void writeRegister(uint8_t addr, uint8_t value);
     uint8_t readRegister(uint8_t addr);
+    uint8_t readRegisters(uint8_t addr, uint8_t* data, uint8_t len);
 
 protected:
     SPI_HandleTypeDef& spi;
@@ -94,7 +95,7 @@ public:
 			GPIO_TypeDef* gyro_cs_port, uint16_t gyro_cs_pin,
 			GPIO_TypeDef* mag_cs_port, uint16_t mag_cs_pin);
 
-    uint8_t begin();
+    bool begin();
     void reset();
 };
 

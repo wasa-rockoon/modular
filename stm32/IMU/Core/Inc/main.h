@@ -7,13 +7,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2020 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2022 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
@@ -28,7 +27,7 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32f0xx_hal.h"
+#include "stm32g4xx_hal.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -58,22 +57,29 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define DRDYM_Pin GPIO_PIN_0
+#define DRDYM_GPIO_Port GPIOA
 #define LED_Pin GPIO_PIN_1
 #define LED_GPIO_Port GPIOA
-#define GPS_TX_Pin GPIO_PIN_2
-#define GPS_TX_GPIO_Port GPIOA
-#define GPS_RX_Pin GPIO_PIN_3
-#define GPS_RX_GPIO_Port GPIOA
-#define CS_ACCEL_Pin GPIO_PIN_4
-#define CS_ACCEL_GPIO_Port GPIOA
+#define CS_ACCL_Pin GPIO_PIN_4
+#define CS_ACCL_GPIO_Port GPIOA
 #define CS_MAG_Pin GPIO_PIN_5
 #define CS_MAG_GPIO_Port GPIOA
 #define CS_GYRO_Pin GPIO_PIN_6
 #define CS_GYRO_GPIO_Port GPIOA
-#define CS_PRESS_Pin GPIO_PIN_7
-#define CS_PRESS_GPIO_Port GPIOA
+#define CS_PRES_Pin GPIO_PIN_7
+#define CS_PRES_GPIO_Port GPIOA
+#define SPI_SCK_Pin GPIO_PIN_13
+#define SPI_SCK_GPIO_Port GPIOB
+#define SPI_MISO_Pin GPIO_PIN_14
+#define SPI_MISO_GPIO_Port GPIOB
+#define SPI_MOSI_Pin GPIO_PIN_15
+#define SPI_MOSI_GPIO_Port GPIOB
+#define CAN_RX_Pin GPIO_PIN_11
+#define CAN_RX_GPIO_Port GPIOA
+#define CAN_TX_Pin GPIO_PIN_12
+#define CAN_TX_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
-
 
 /* USER CODE END Private defines */
 
