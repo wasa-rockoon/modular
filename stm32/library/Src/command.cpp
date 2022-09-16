@@ -119,6 +119,12 @@ uint8_t Entry::decodeHex(const uint8_t* buf) {
     }
 }
 
+Entry& Entry::operator=(const Entry& entry) {
+	type = entry.type;
+	payload.uint = entry.payload.uint;
+	return *this;
+}
+
 
 Command::Command(): id(0), to(0), from(0), size(0) {};
 Command::Command(uint8_t id, uint8_t to, uint8_t from, uint8_t size):
@@ -167,7 +173,21 @@ bool Command::get(uint8_t type, uint8_t index, union Payload& p) const {
 	return false;
 }
 
+int32_t Command::getDiag(uint32_t& raw) const {
+	for (int n = 0; n < size; n++) {
+		uint8_t type = entries[n].type;
+		if ('0' <= type && type <= '9') {
+			raw = entries[n].payload.uint;
+			return 0b1 << (type - '0');
+		}
+	}
+	return -1;
+}
+
 void Command::addTimestamp(uint32_t time) {
+	if (size >= MAX_ENTRIES) {
+		return;
+	}
 	entries[size].set('t', time);
 	size++;
 }
@@ -178,8 +198,7 @@ Command& Command::operator=(const Command& command) {
 	from = command.from;
 	size = command.size;
 	for (int n = 0; n < size; n++) {
-		entries[n].type = command.entries[n].type;
-		entries[n].payload = command.entries[n].payload;
+		entries[n] = command.entries[n];
 	}
 	return *this;
 }
@@ -286,6 +305,11 @@ bool CANChannel::receive(uint16_t std_id, const uint8_t* data, uint8_t len) {
 	// Start receiving_ new command
 	if (entry.type == 0) {
 		rx.setHeader(entry);
+
+		if (rx.id == 0) {
+			return false;
+		}
+
 		if (rx.size > MAX_ENTRIES) rx.size = MAX_ENTRIES;
 		receiving_ = 0;
 	}

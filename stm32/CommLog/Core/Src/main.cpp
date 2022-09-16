@@ -16,9 +16,9 @@
   *
   ******************************************************************************
   */
-#ifdef DEBUG
-#define MAX_ENTRIES 8
-#endif
+//#ifdef DEBUG
+//#define MAX_ENTRIES 7
+//#endif
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -29,6 +29,7 @@
 #include <cstdio>
 #include <string.h>
 #include "command.hpp"
+#include "diagnostics.hpp"
 #include "uart.hpp"
 #include "es920lr.hpp"
 
@@ -43,7 +44,7 @@
 /* USER CODE BEGIN PD */
 
 
-#define LAUNCHER
+//#define LAUNCHER
 
 #ifndef LAUNCHER
 #define GS
@@ -70,15 +71,16 @@ const char DEST_ADDR[] = "0000";
 //#define LORA_BAUD 115200
 #define LORA_BAUD 38400
 
+#define COMMAND_REPEAT_FREQ 1
 
-#define CAN_SEND_TIMEOUT_TICK 10
+#define CAN_SEND_TIMEOUT_TICK 100
 
 #define LORA_TIMEOUT_TICK 30000
 
 #define UPLINK_WAIT_TICK 5000
 #define SETTING_CONFIRM_TICK 1000
 
-#define BLINK_TICK 500
+#define BLINK_TICK 200
 
 /* USER CODE END PD */
 
@@ -128,6 +130,8 @@ void CAN_Send();
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+Diagnostics diag(MODULE_COMMLOG);
+
 CANChannel can;
 HexChannel sd;
 
@@ -151,24 +155,29 @@ FRESULT fresult;  // result
 UINT br, bw;  // File read/write count
 
 bool file_opened = false;
+bool twelite_ok = true;
 
 uint32_t blink_tick = 0;
+
+//uint32_t count = 0;
 
 #ifdef LAUNCHER
 
 Command tlm_nav('n', 'L', 0, 0);
+Command tlm_launcher('l', 'L', 0, 3);
 Command tlm_mode('m', 'L', 0, 0);
-Command tlm_launcher('l', 'L', 0, 0);
-Command tlm_settings('s', 'L', 0, 0);
+uint8_t tlm_mode_size = 0;
+uint8_t send_settings = 0;
+
+//Command command_mode('m', 0, 0, 0);
 
 enum class TlmState {
 	Init,
 	SendingNav,
-	SendingMode,
 	SendingLauncher,
 	WaitingUplink,
 	ConfirmingSettings,
-	SendingSettings,
+	SendingMode,
 };
 
 TlmState tlm_state = TlmState::Init;
@@ -179,8 +188,8 @@ uint32_t tlm_state_tick = 0;
 
 #ifdef GS
 
-Command command_mode;
-Command command_settings;
+Command command_mode('m', 'L', 0, 0);
+Command command_settings('s', 'L', 0, 0);
 
 bool send_settings = false;
 
@@ -193,16 +202,13 @@ void ChangeState(TlmState new_state) {
 #ifdef DEBUG
 	switch (new_state) {
 	case TlmState::Init:
-		printf("Init State\n");
+		printf("Init\n");
 		break;
 	case TlmState::SendingNav:
-		printf("Sending Nav Tlm\n");
-		break;
-	case TlmState::SendingMode:
-		printf("Sending Mode Tlm\n");
+		printf("Nav Tlm\n");
 		break;
 	case TlmState::SendingLauncher:
-		printf("Sending Launcher Tlm\n");
+		printf("Launcher Tlm\n");
 		break;
 	case TlmState::WaitingUplink:
 		printf("Waiting Uplink\n");
@@ -210,8 +216,8 @@ void ChangeState(TlmState new_state) {
 	case TlmState::ConfirmingSettings:
 		printf("Confirming Settings\n");
 		break;
-	case TlmState::SendingSettings:
-		printf("Sending Settings Tlm\n");
+	case TlmState::SendingMode:
+		printf("Mode Tlm\n");
 		break;
 	}
 #endif
@@ -268,7 +274,7 @@ bool SD_Init() {
 	//
 	//  printf("File opened: %s, total: %d, free: %d, %d\n",
 	//		  file_name, total, free_space, fresult);
-	printf("File: %s, %d\n", file_name, fresult);
+//	printf("File: %s, %d\n", file_name, fresult);
 #endif
 
 	return fresult == FR_OK;
@@ -278,6 +284,13 @@ bool SD_Init() {
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim == &htim14) {
+
+#ifdef DEBUG
+//    	printf("A\n");
+//    	diag.update(HAL_GetTick());
+//    	diag.printSummary();
+#endif
+
 #ifndef DEBUG
     	HAL_IWDG_Refresh(&hiwdg);
 #endif
@@ -286,33 +299,44 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void CAN_Received() {
 
+//	count++;
+
+	uint32_t raw;
+	int32_t mid = can.rx.getDiag(raw);
+	if (mid >= 0) {
+		diag.update(mid, raw, HAL_GetTick());
+	}
+
 	switch (can.rx.id) {
 #ifdef LAUNCHER
+	// Navigation
+	case 'P':
+		tlm_nav = can.rx;
+		tlm_nav.id = 'n';
+		break;
+	// Laucnher
 	case 'B':
 		tlm_launcher.entries[0].set('V', can.rx.get('P', 0, 0.0f));
-		tlm_launcher.size = 1;
 		break;
-	case 'P':
-		tlm_nav.entries[0].set('O', can.rx.get('O', 0, 0.0f));
-		tlm_nav.entries[1].set('A', can.rx.get('A', 0, 0.0f));
-		tlm_nav.entries[2].set('H', can.rx.get('H', 0, 0.0f));
-		tlm_nav.entries[3].set('P', can.rx.get('P', 0, 0.0f));
-		tlm_nav.size = 4;
+	case 'E':
+		tlm_launcher.entries[1].set('I', can.rx.get('I', 0, 0.0f));
 		break;
+	case 'I':
+		tlm_launcher.entries[2].set('R', can.rx.get('R', 0, 0.0f));
+		break;
+	// Mode
 	case 'M':
 		tlm_mode = can.rx;
 		tlm_mode.id = 'm';
+		tlm_mode_size = tlm_mode.size - 1;
 		break;
 	case 'S':
-		tlm_settings.entries[0].set('I', can.rx.get('I', 0,
-				tlm_settings.entries[0].payload.float_));
-		tlm_settings.entries[1].set('S', can.rx.get('S', 0,
-				tlm_settings.entries[1].payload.float_));
-		tlm_settings.entries[2].set('A', can.rx.get('A', 0,
-				tlm_settings.entries[2].payload.float_));
-		tlm_settings.entries[3].set('Q', can.rx.get('Q', 0,
-				tlm_settings.entries[3].payload.float_));
-		tlm_settings.size = 4;
+		send_settings = 0;
+
+		for (int n = 0; n < can.rx.size; n++) {
+			tlm_mode.entries[tlm_mode_size + n + 1] = can.rx.entries[n];
+			send_settings++;
+		}
 		break;
 #endif
 #ifdef GS
@@ -331,6 +355,15 @@ void CAN_Received() {
 		can.rx.addTimestamp(HAL_GetTick());
 		sd.tx.push(can.rx);
 	}
+}
+
+void LoRa_Send(Command& tlm) {
+	lora.send(PANID, DEST_ADDR, tlm);
+	lora_last_send_tick = HAL_GetTick();
+	Blink();
+#ifdef DEBUG
+//	diag.printSummary();
+#endif
 }
 
 /* USER CODE END 0 */
@@ -396,7 +429,6 @@ int main(void)
   HAL_Delay(100);
   HAL_GPIO_WritePin(TWE_NRST_GPIO_Port, TWE_NRST_Pin, GPIO_PIN_SET);
 
-
 #ifdef LORA_SETUP
   LoRa_Setup();
 #else
@@ -404,7 +436,11 @@ int main(void)
 #endif
   lora.startOperation();
 
-  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+  if (file_opened) HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+
+#ifdef DEBUG
+//  printf("Init\n");
+#endif
 
   /* USER CODE END 2 */
 
@@ -412,25 +448,34 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+
+	  diag.setStatus(STATUS_0, !file_opened);
+	  diag.setStatus(STATUS_1, !lora.inOperation());
+
 //	  printf("%d %d %d\n", count0, count1, count0 + count1);
 
 #ifdef LAUNCHER
 	  if (tlm_state == TlmState::Init && lora.readyToSend()) {
-		  lora.send(PANID, DEST_ADDR, tlm_nav);
-		  lora_last_send_tick = HAL_GetTick();
+		  LoRa_Send(tlm_nav);
 
 		  ChangeState(TlmState::SendingNav);
 	  }
-	  else if (tlm_state == TlmState::WaitingUplink &&
-			  HAL_GetTick() - tlm_state_tick >= UPLINK_WAIT_TICK) {
-		  ChangeState(tlm_state = TlmState::Init);
-	  }
-	  else if (tlm_state == TlmState::ConfirmingSettings &&
-			  HAL_GetTick() - tlm_state_tick >= SETTING_CONFIRM_TICK) {
-		  lora.send(PANID, DEST_ADDR, tlm_settings);
-		  lora_last_send_tick = HAL_GetTick();
+	  else if ((tlm_state == TlmState::WaitingUplink &&
+			  HAL_GetTick() - tlm_state_tick >= UPLINK_WAIT_TICK) ||
+			  (tlm_state == TlmState::ConfirmingSettings &&
+			  HAL_GetTick() - tlm_state_tick >= SETTING_CONFIRM_TICK)) {
 
-		  ChangeState(TlmState::SendingSettings);
+		  tlm_mode.entries[tlm_mode_size].set(
+				  '0' + MODULE_COMMLOG_N, (uint32_t)diag.encode());
+		  uint8_t size = tlm_mode.size;
+		  tlm_mode.size += send_settings;
+
+		  LoRa_Send(tlm_mode);
+
+		  tlm_mode.size = size;
+
+		  ChangeState(TlmState::SendingMode);
 	  }
 #endif
 
@@ -439,7 +484,7 @@ int main(void)
 
 		  // LoRa complete sending
 		  if (code >= 0) {
-			  Blink();
+
 #ifdef DEBUG
 			  printf("LoRa Sent: %d\n", code);
 #endif
@@ -447,35 +492,39 @@ int main(void)
 #ifdef LAUNCHER
 			  if (lora.readyToSend()) {
 				  switch (tlm_state) {
-				  case TlmState::SendingNav:
-					  lora.send(PANID, DEST_ADDR, tlm_mode);
-					  lora_last_send_tick = HAL_GetTick();
 
-					  ChangeState(TlmState::SendingMode);
-					  break;
-				  case TlmState::SendingMode:
-					  lora.send(PANID, DEST_ADDR, tlm_launcher);
-					  lora_last_send_tick = HAL_GetTick();
+				  case TlmState::SendingNav:
+					  LoRa_Send(tlm_launcher);
 
 					  ChangeState(TlmState::SendingLauncher);
 					  break;
+
 				  case TlmState::SendingLauncher:
 					  ChangeState(TlmState::WaitingUplink);
 					  break;
-				  case TlmState::SendingSettings:
+
+				  case TlmState::SendingMode:
 					  ChangeState(TlmState::Init);
 					  break;
+
 				  default:
 					  ChangeState(TlmState::Init);
+					  break;
 				  }
 			  }
 			  else ChangeState(TlmState::Init);
 #endif
 
+			  diag.update(HAL_GetTick());
+
 			  Command tlm('S', 0, 0, 3);
 			  tlm.entries[0].set('C', (int32_t)code);
 			  tlm.entries[1].set('O', (uint32_t)lora.tx_ok_count);
 			  tlm.entries[2].set('N', (uint32_t)lora.tx_ng_count);
+#ifdef LAUNCHER
+			  tlm.entries[3].set('0' + MODULE_COMMLOG_N, (uint32_t)diag.encode());
+			  tlm.size = 4;
+#endif
 
 			  can.tx.push(tlm);
 			  CAN_Send();
@@ -504,7 +553,7 @@ int main(void)
 #endif
 #ifdef LAUNCHER
 			  if (tlm_state == TlmState::WaitingUplink) {
-				  if (rx.id == 's') {
+				  if (rx.id == 'm' || rx.id == 's') {
 					  ChangeState(TlmState::ConfirmingSettings);
 				  }
 				  else {
@@ -530,16 +579,26 @@ int main(void)
 #endif
 			  can.tx.push(rx);
 
+			  if (file_opened) {
+				  rx.addTimestamp(HAL_GetTick());
+				  sd.tx.push(rx);
+			  }
+
+			  diag.update(HAL_GetTick());
+
 			  Command tlm('R', 0, 0, 2);
 			  tlm.entries[0].set('R', (int32_t)lora.rssi);
 			  tlm.entries[1].set('C', (uint32_t)lora.rx_count);
+#ifdef LAUNCHER
+			  tlm.entries[2].set('0' + MODULE_COMMLOG_N, (uint32_t)diag.encode());
+			  tlm.size = 3;
+#endif
+
 			  can.tx.push(tlm);
 			  CAN_Send();
 
 			  if (file_opened) {
-				  rx.addTimestamp(HAL_GetTick());
 				  tlm.addTimestamp(HAL_GetTick());
-				  sd.tx.push(rx);
 				  sd.tx.push(tlm);
 			  }
 		  }
@@ -552,7 +611,7 @@ int main(void)
 		  while (true) {
 			  int remains = sd.send(buf, len);
 
-			  if (len == 0) continue;
+			  if (len == 0) break;
 
 			  f_puts((char*)buf, &fil);
 
@@ -563,14 +622,6 @@ int main(void)
 	  if (file_opened && HAL_GetTick() - sd_last_sync_tick >= SD_SYNC_TICK){
 		  f_sync(&fil);
 		  sd_last_sync_tick = HAL_GetTick();
-	  }
-
-	  if (can.isSending() &&
-			  HAL_GetTick() - can_last_send_tick >= CAN_SEND_TIMEOUT_TICK) {
-		  can.cancelSending();
-#ifdef DEBUG
-		  printf("TIMEOUT\n");
-#endif
 	  }
 
 
@@ -811,7 +862,7 @@ static void MX_TIM14_Init(void)
   htim14.Instance = TIM14;
   htim14.Init.Prescaler = 48000;
   htim14.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim14.Init.Period = 1000;
+  htim14.Init.Period = 1000 / COMMAND_REPEAT_FREQ;
   htim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim14) != HAL_OK)
@@ -987,7 +1038,8 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 void Blink() {
-	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+	if (file_opened)
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 	blink_tick = HAL_GetTick();
 }
 
@@ -1030,7 +1082,6 @@ void CAN_Send() {
 #ifdef DEBUG
 				printf("BUSY\n");
 #endif
-				return;
 			}
 		}
 

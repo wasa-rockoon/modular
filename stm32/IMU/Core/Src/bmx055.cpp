@@ -52,7 +52,11 @@ bool BMX055::begin() {
 	uint8_t gyro_id = Gyro.readRegister(0);
 	uint8_t mag_id = Mag.readRegister(0x40);
 
-	if (accl_id != 0b11111010 || gyro_id != 0x0F || mag_id != 0b00110010)
+	Accl.ok = accl_id == 0b11111010;
+	Gyro.ok = gyro_id == 0x0F;
+	Mag.ok  = mag_id != 0b0011001;
+
+	if (!Accl.ok || !Gyro.ok || !Mag.ok)
 		return false;
 
     return true;
@@ -142,6 +146,11 @@ Vec3 Accelerometer::read() {
     uint8_t data[6];
     readRegisters(2, data, 6);
 
+//    ok = false;
+//    for (int i = 0; i < 6; i++) {
+//    	ok = ok || (data[i] != 0);
+//    }
+
     // Convert the data to 12-bits
     int x = ((unsigned)data[1] << 4) + ((unsigned)data[0] >> 4);
     if (x > 2047) x -= 4096;
@@ -161,6 +170,11 @@ Gyroscope::Gyroscope(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16_t cs_
 Vec3 Gyroscope::read() {
     uint8_t data[6];
     readRegisters(2, data, 6);
+
+//    ok = false;
+//    for (int i = 0; i < 6; i++) {
+//    	ok = ok || (data[i] != 0);
+//    }
 
     // Convert the data
     int x = ((unsigned)data[1] << 8) + (unsigned)data[0];
@@ -198,11 +212,13 @@ Magnetometer::Magnetometer(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16
 		Function(spi, cs_port, cs_pin) {}
 
 Vec3 Magnetometer::read() {
-
-	uint8_t mag_id = readRegister(0x40);
-
     uint8_t data[6];
     readRegisters(0x42, data, 6);
+//
+//    ok = false;
+//    for (int i = 0; i < 6; i++) {
+//    	ok = ok || (data[i] != 0);
+//    }
 
     // Convert the data
     int x = ((unsigned)data[1] << 5) + ((unsigned)data[0] >> 3);

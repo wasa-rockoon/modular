@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include <cstdio>
 #include "command.hpp"
+#include "diagnostics.hpp"
 #include "bmx055.hpp"
 #include "bmp280.hpp"
 #include "algebra.hpp"
@@ -59,6 +60,8 @@ TIM_HandleTypeDef htim4;
 
 
 /* USER CODE BEGIN PV */
+
+Diagnostics diag(MODULE_IMU);
 
 BMX055 bmx055(hspi2, CS_ACCL_GPIO_Port, CS_ACCL_Pin,
 		  	  	  	   CS_GYRO_GPIO_Port, CS_GYRO_Pin,
@@ -105,6 +108,7 @@ static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 extern "C" void initialise_monitor_handles(void);
 void CAN_Send();
+void CAN_Received();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -117,7 +121,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if (htim == &htim3) {
     	// Sample
 
-    	if (!bmx055_ok) return;
+    	if (!bmx055_ok || !bmp280_ok) return;
 
     	accel = bmx055.Accl.read();
 //    	gyro = bmx055.Gyro.read();
@@ -136,7 +140,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
     }
     else if (htim == &htim4) {
-    	if (!bmx055_ok) return;
+    	if (!bmx055_ok || !bmp280_ok) return;
 
     	// Log
 
@@ -144,7 +148,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
     	accel_avg *= (float)LOG_FREQ / (float)SAMPLE_FREQ;
 
-    	Command att('A', 0, 0, 7);
+
+    	diag.setStatus(STATUS_0, !bmx055.Accl.ok);
+    	diag.setStatus(STATUS_1, !bmx055.Gyro.ok || true);
+    	diag.setStatus(STATUS_2, !bmx055.Mag.ok);
+    	diag.setStatus(STATUS_3, !bmp280_ok);
+    	diag.update(HAL_GetTick());
+
+
+    	Command att('A', 0, 0, 8);
     	att.entries[0].set('Q', (float)q_i2b.b);
     	att.entries[1].set('Q', (float)q_i2b.c);
     	att.entries[2].set('Q', (float)q_i2b.d);
@@ -152,7 +164,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     	att.entries[4].set('A', (float)accel_avg.x);
     	att.entries[5].set('A', (float)accel_avg.y);
     	att.entries[6].set('A', (float)accel_avg.z);
-    	att.entries[7].set('P', (float)p_altitude);
+    	att.entries[7].set('0' + MODULE_IMU_N, (uint32_t)diag.encode());
+
     	can.tx.push(att);
 
     	CAN_Send();
@@ -169,6 +182,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     	printf("M %s\n", buf);
 
     	printf("H %d\n", (int)(p_altitude));
+
+    	diag.printSummary();
 #endif
 
     	HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
@@ -178,6 +193,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     	HAL_IWDG_Refresh(&hiwdg);
   #endif
     }
+}
+
+void CAN_Received() {
+	uint32_t raw;
+	int32_t mid = can.rx.getDiag(raw);
+	if (mid >= 0) diag.update(mid, raw, HAL_GetTick());
 }
 
 /* USER CODE END 0 */
@@ -234,6 +255,7 @@ int main(void)
 
   bmx055_ok = bmx055.begin();
   bmp280_ok = bmp280.begin();
+
   bmx055_ok = bmx055.begin();
 //  bmp280_ok = bmp280.begin();
 

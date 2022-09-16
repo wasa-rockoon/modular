@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <cstdio>
 #include "command.hpp"
+#include "diagnostics.hpp"
 
 /* USER CODE END Includes */
 
@@ -38,8 +39,8 @@
 /* USER CODE BEGIN PD */
 
 #define SAMPLE_FREQ 100
-//#define SEND_FREQ 10
-#define SEND_FREQ 0.2
+#define SEND_FREQ 4
+//#define SEND_FREQ 0.2
 
 #define ENABLE_TLM
 
@@ -51,8 +52,9 @@
 #define VCC_FIX (5.03 / 4.69)
 #define VDD_FIX (3.35 / 3.23)
 
+#define VPP_V_MIN 7.0
 
-#define CAN_SEND_TIMEOUT_TICK 50
+#define CAN_SEND_TIMEOUT_TICK 20
 
 /* USER CODE END PD */
 
@@ -74,26 +76,7 @@ TIM_HandleTypeDef htim14;
 
 /* USER CODE BEGIN PV */
 
-/* USER CODE END PV */
-
-/* Private function prototypes -----------------------------------------------*/
-void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_CAN_Init(void);
-static void MX_DMA_Init(void);
-static void MX_IWDG_Init(void);
-static void MX_ADC_Init(void);
-static void MX_TIM2_Init(void);
-static void MX_TIM14_Init(void);
-/* USER CODE BEGIN PFP */
-
-extern "C" void initialise_monitor_handles(void);
-void CAN_Send();
-
-/* USER CODE END PFP */
-
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
+Diagnostics diag(MODULE_BATTERY);
 
 CANChannel can;
 
@@ -113,6 +96,28 @@ float vpp_V;
 float vcc_V;
 float vdd_V;
 
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_CAN_Init(void);
+static void MX_DMA_Init(void);
+static void MX_IWDG_Init(void);
+static void MX_ADC_Init(void);
+static void MX_TIM2_Init(void);
+static void MX_TIM14_Init(void);
+/* USER CODE BEGIN PFP */
+
+extern "C" void initialise_monitor_handles(void);
+void CAN_Send();
+void CAN_Received();
+
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim == &htim2) {
@@ -130,25 +135,34 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     	vcc_A = vcc_A * (1 - CURRENT_FILTER_A) + vcc_A_ * CURRENT_FILTER_A;
     	vdd_A = vdd_A * (1 - CURRENT_FILTER_A) + vdd_A_ * CURRENT_FILTER_A;
 
-
+    	diag.setStatus(STATUS_0, vpp_V < VPP_V_MIN);
+    	diag.update(HAL_GetTick());
     }
     else if (htim == &htim14) {
 #ifdef DEBUG
 		printf("Vpp: %d.%03d V\n", (int)vpp_V, abs((int)(vpp_V * 1000) % 1000));
 		printf("Vcc: %d.%03d V, %d mA\n", (int)vcc_V, abs((int)(vcc_V * 1000) % 1000), (int)(vcc_A * 1000));
 		printf("Vdd: %d.%03d V, %d mA\n", (int)vdd_V, abs((int)(vdd_V * 1000) % 1000), (int)(vdd_A * 1000));
+
+		diag.printSummary();
+
 #endif
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+		if (diag.getStatus(MODULE_BATTERY, STATUS_ALL) == STATUS_NG)
+			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+		else
+			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
 #ifdef ENABLE_TLM
 
-		Command tlm('B', 0, 0, 5);
+		Command tlm('B', 0, 0, 6);
 
-		tlm.entries[0].set('P', vpp_V);
-		tlm.entries[1].set('C', vcc_V);
-		tlm.entries[2].set('D', vdd_V);
-		tlm.entries[3].set('c', vcc_A);
-		tlm.entries[4].set('d', vdd_A);
+		tlm.entries[0].set('P', (float)vpp_V);
+		tlm.entries[1].set('C', (float)vcc_V);
+		tlm.entries[2].set('D', (float)vdd_V);
+		tlm.entries[3].set('c', (float)vcc_A);
+		tlm.entries[4].set('d', (float)vdd_A);
+		volatile uint32_t d = diag.encode();
+		tlm.entries[5].set('0' + MODULE_BATTERY_N, (uint32_t)d);
 
 		can.tx.push(tlm);
 
@@ -156,6 +170,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 #endif
     }
 }
+
+void CAN_Received() {
+	uint32_t raw;
+	int32_t mid = can.rx.getDiag(raw);
+	if (mid >= 0) diag.update(mid, raw, HAL_GetTick());
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -201,7 +222,7 @@ int main(void)
   HAL_ADCEx_Calibration_Start(&hadc);
   HAL_ADC_Start_DMA(&hadc, (uint32_t*)adc_values, 10);
 
-  HAL_Delay(1000);
+  HAL_Delay(1100);
 
   HAL_TIM_Base_Start_IT(&htim2);
   HAL_TIM_Base_Start_IT(&htim14);
@@ -610,6 +631,8 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 	}
 
 	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
+		can.cancelSending();
+		CAN_Received();
 	}
 }
 void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
@@ -621,6 +644,8 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
 	}
 
 	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
+		can.cancelSending();
+		CAN_Received();
 	}
 }
 
@@ -640,7 +665,6 @@ void CAN_Send() {
 #ifdef DEBUG
 				printf("BUSY\n");
 #endif
-				return;
 			}
 		}
 

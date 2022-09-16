@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cmath>
 #include "command.hpp"
+#include "diagnostics.hpp"
 
 /* USER CODE END Includes */
 
@@ -47,6 +48,8 @@
 #define IGN_TH_T0 25
 #define ENV_TH_B 3435
 #define IGN_TH_B 3960
+#define ENV_PULLDOWN 99800
+#define IGN_PULLUP 46700
 
 #define CAN_SEND_TIMEOUT_TICK 50
 
@@ -69,6 +72,8 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim14;
 
 /* USER CODE BEGIN PV */
+
+Diagnostics diag(MODULE_SENSOR);
 
 CANChannel can;
 
@@ -103,6 +108,7 @@ static void MX_TIM14_Init(void);
 
 extern "C" void initialise_monitor_handles(void);
 void CAN_Send();
+void CAN_Received();
 
 /* USER CODE END PFP */
 
@@ -122,8 +128,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     		voltages[i] = (float)adc_values[i] * 3.3 / 4095;
     	}
 
-    	r_env = 10000.0 * (3.3 / voltages[0] - 1.0);
-    	r_ign = 10000.0 * voltages[1] / (5.0 - voltages[1]);
+    	if (voltages[0] < 0.01) {
+
+    	}
+
+    	r_env = ENV_PULLDOWN * (3.3 / voltages[0] - 1);
+    	r_ign = IGN_PULLUP * voltages[1] / (3.3 - voltages[1]);
 
     	env_temperature = CalcThermistor(r_env, ENV_TH_B, ENV_TH_R0, ENV_TH_T0);
     	igniter_temperature = CalcThermistor(r_ign, IGN_TH_B, IGN_TH_R0, IGN_TH_T0);;
@@ -137,26 +147,43 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 		CAN_Send();
 
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+		diag.update(HAL_GetTick());
     }
     else if (htim == &htim14) { // Send mode
 
     	flight_mode = !HAL_GPIO_ReadPin(FLIGHT_PIN_GPIO_Port, FLIGHT_PIN_Pin);
 
-		Command flight('F', 0, 0, 1);
+    	diag.setStatus(STATUS_0, !flight_mode);
+
+		Command flight('F', 0, 0, 2);
 
 		if (flight_mode) flight.entries[0].set('F');
 		else             flight.entries[0].set('S');
 
+		flight.entries[1].set('0' + MODULE_SENSOR_N, (uint32_t)diag.encode());
+
 		can.tx.push(flight);
+
+		CAN_Send();
 
 #ifdef DEBUG
 		printf("Env: %d deg\n", (int)(env_temperature));
 		printf("Ign: %d deg\n", (int)(igniter_temperature));
 		printf("Flight: %d\n", flight_mode);
+
+		diag.printSummary();
 #endif
+
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
     }
 }
+
+void CAN_Received() {
+	uint32_t raw;
+	int32_t mid = can.rx.getDiag(raw);
+	if (mid >= 0) diag.update(mid, raw, HAL_GetTick());
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -226,9 +253,9 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  HAL_Delay(100);
+//	  HAL_Delay(100);
 
-	  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+//	  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
 #ifndef DEBUG
 	  HAL_IWDG_Refresh(&hiwdg);
@@ -591,6 +618,8 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 	}
 
 	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
+		can.cancelSending();
+		CAN_Received();
 	}
 }
 void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
@@ -602,6 +631,8 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
 	}
 
 	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
+		can.cancelSending();
+		CAN_Received();
 	}
 }
 
@@ -621,7 +652,6 @@ void CAN_Send() {
 #ifdef DEBUG
 				printf("BUSY\n");
 #endif
-				return;
 			}
 		}
 

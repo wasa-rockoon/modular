@@ -46,6 +46,8 @@ struct Entry {
 	uint8_t encodeHex(uint8_t* buf) const;
 	uint8_t decode(const uint8_t* buf);
 	uint8_t decodeHex(const uint8_t* buf);
+
+	Entry& operator=(const Entry& entry);
 };
 
 struct Command {
@@ -61,9 +63,10 @@ struct Command {
 	void setHeader(Entry header);
 	Entry getHeader() const;
 
-	float get(uint8_t type, uint8_t index = 0, float default_ = std::nan("")) const;
+	float get(uint8_t type, uint8_t index, float default_) const;
 	bool get(uint8_t type, uint8_t index = 0) const;
 	bool get(uint8_t type, uint8_t index, union Payload& p) const;
+	int32_t getDiag(uint32_t& raw) const;
 
 	void addTimestamp(uint32_t time);
 
@@ -76,8 +79,8 @@ public:
 	Queue();
 
 	inline uint8_t size() const { return size_; };
-	inline const Command& first() const { return buf[read_ptr_]; };
-	inline const Command& last() const { return buf[(write_ptr_ - 1) % N]; };
+	inline Command& first()  { return buf[read_ptr_]; };
+	inline Command& last() { return buf[(write_ptr_ - 1) % N]; };
 
 //	bool push(Command& command);
 //	bool push();

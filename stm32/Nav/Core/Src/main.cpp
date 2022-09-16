@@ -24,8 +24,8 @@
 #include <cstdio>
 #include <time.h>
 #include "command.hpp"
+#include "diagnostics.hpp"
 #include "bmp280.hpp"
-//#include "lwgps.h"
 #include "TinyGPS++.h"
 #include "uart.hpp"
 /* USER CODE END Includes */
@@ -46,6 +46,8 @@
 
 #define PRESSURE_FILTER_A 0.5
 #define ALTITUDE_FILTER_A 0.5
+
+#define ALTITUDE_DIFF 2000
 
 /* USER CODE END PD */
 
@@ -70,7 +72,10 @@ DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
 
+Diagnostics diag(MODULE_NAV);
+
 BMP280 bmp280(hspi2, CS_PRES_GPIO_Port, CS_PRES_Pin);
+bool bmp280_ok;
 
 TinyGPSPlus gps;
 UART gps_uart(huart2);
@@ -83,9 +88,14 @@ uint8_t               CanTxData[8];
 uint8_t               CanRxData[8];
 uint32_t              CanTxMailbox;
 
+float pressure_raw;
+float p_altitude_raw;
+float temperature_raw;
+float p_v_speed_raw;
 float pressure;
 float p_altitude;
 float temperature;
+float p_v_speed;
 
 float qnh_pa = 101325;
 
@@ -119,13 +129,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if (htim == &htim3) {
     	// Sample
 
-    	float pressure_ = bmp280.readPressure();
-    	float p_altitude_ = bmp280.readAltitude(qnh_pa / 100.0);
-    	float temperature_ = bmp280.readTemperature();
+    	float p_altitude_raw_p = p_altitude_raw;
 
-    	pressure = pressure * (1 - PRESSURE_FILTER_A) + pressure_ * PRESSURE_FILTER_A;
-    	p_altitude = p_altitude * (1 - PRESSURE_FILTER_A) + p_altitude_ * PRESSURE_FILTER_A;
-    	temperature = temperature * (1 - PRESSURE_FILTER_A) + temperature_ * PRESSURE_FILTER_A;
+    	pressure_raw    = bmp280.readPressure();
+    	p_altitude_raw  = bmp280.readAltitude(qnh_pa / 100.0);
+    	temperature_raw = bmp280.readTemperature();
+    	p_v_speed_raw   = (p_altitude_raw - p_altitude_raw_p) * SAMPLE_FREQ;
+
+    	pressure    = pressure    * (1 - PRESSURE_FILTER_A) + pressure_raw    * PRESSURE_FILTER_A;
+    	p_altitude  = p_altitude  * (1 - PRESSURE_FILTER_A) + p_altitude_raw  * PRESSURE_FILTER_A;
+    	temperature = temperature * (1 - PRESSURE_FILTER_A) + temperature_raw * PRESSURE_FILTER_A;
+    	p_v_speed   = p_v_speed   * (1 - PRESSURE_FILTER_A) + p_v_speed_raw   * PRESSURE_FILTER_A;
+
     }
     else if (htim == &htim4) {
 
@@ -143,30 +158,58 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void Measure() {
 
-	Command pos('P', 0, 0, 1);
-	pos.entries[0].set('P', (float)p_altitude);
+	bool location_ok = gps.location.age() < GPS_LOST_TICK;
+	bool altitude_ok = gps.altitude.age() < GPS_LOST_TICK;
+	bool altitude_same = abs(gps.altitude.value() - p_altitude) < ALTITUDE_DIFF;
 
-	if (gps.location.isValid() && gps.location.age() < GPS_LOST_TICK) {
-		pos.entries[1].set('O', (float)gps.location.lng());
-		pos.entries[2].set('A', (float)gps.location.lat());
-		pos.entries[3].set('H', (float)gps.altitude.meters());
-		pos.entries[4].set('D', (uint32_t)gps.date.value());
-		pos.entries[5].set('T', (uint32_t)gps.time.value());
-		pos.entries[6].set('S', (int32_t)gps.satellites.value());
-		pos.size = 7;
+	diag.setStatus(STATUS_0, !location_ok);
+	diag.setStatus(STATUS_1, !altitude_ok);
+	diag.setStatus(STATUS_2, !bmp280_ok);
+	diag.setStatus(STATUS_3, !altitude_same);
+	diag.update(HAL_GetTick());
+
+	Command pos('P', 0, 0, 2);
+	pos.entries[0].set('P', (float)p_altitude);
+	pos.entries[1].set('V', (float)p_v_speed);
+
+	if (location_ok) {
+		pos.entries[2].set('O', (float)gps.location.lng());
+		pos.entries[3].set('A', (float)gps.location.lat());
+
+		pos.size += 2;
 	}
+	if (altitude_ok) {
+		pos.entries[pos.size].set('H', (float)gps.altitude.meters());
+
+		pos.size++;
+	}
+
 	can.tx.push(pos);
 
-	Command env('E', 0, 0, 2);
+	Command env('E', 0, 0, 3);
 	env.entries[0].set('P', (float)pressure);
-	env.entries[1].set('T', (float)temperature);
+	env.entries[1].set('I', (float)temperature);
+	env.entries[2].set('0' + MODULE_NAV_N, (uint32_t)diag.encode());
+
+	if (gps.date.age() < GPS_LOST_TICK) {
+		env.entries[env.size].set('D', (uint32_t)gps.date.value());
+		env.size++;
+	}
+	if (gps.time.age() < GPS_LOST_TICK) {
+		env.entries[env.size].set('T', (uint32_t)gps.time.value());
+		env.size++;
+	}
+	if (gps.satellites.age() < GPS_LOST_TICK) {
+		env.entries[env.size].set('S', (int32_t)gps.satellites.value());
+		env.size++;
+	}
 
 	can.tx.push(env);
 
 	CAN_Send();
 
 //
-//#ifdef DEBUG
+#ifdef DEBUG
 //	printf("P %d\n", (int)(pressure));
 //	printf("H %d\n", (int)(p_altitude));
 //	printf("T %d\n", (int)(temperature));
@@ -176,7 +219,8 @@ void Measure() {
 //		printf("Lng: %d\n", (int)(gps.location.lat() * 1000));
 //		printf("Alt: %d\n", (int)(gps.altitude.meters() * 1000));
 //	}
-//#endif
+//	diag.printSummary();
+#endif
 
 	HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 }
@@ -184,6 +228,10 @@ void Measure() {
 
 
 void CAN_Received() {
+	uint32_t raw;
+	int32_t mid = can.rx.getDiag(raw);
+	if (mid >= 0) diag.update(mid, raw, HAL_GetTick());
+
 	if (can.rx.id == 's') {
 		qnh_pa = can.rx.get('Q', 0, qnh_pa);
 
@@ -241,7 +289,7 @@ int main(void)
 
   HAL_Delay(100);
 
-  bool bmp280_ok = bmp280.begin();
+  bmp280_ok = bmp280.begin();
   HAL_Delay(100);
   bmp280_ok = bmp280.begin();
 
@@ -270,7 +318,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 	  while (!gps_uart.rxIsEmpty()) {
-		  volatile uint8_t c = gps_uart.read();
+		  uint8_t c = gps_uart.read();
 		  gps.encode(c);
 //		  printf("%c", c);
 	  }
@@ -699,6 +747,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
 //			 printf("0%c\n", CanRxData[0]);
 //			 if (can.receive(CanRxHeader.Identifier, CanRxData, CanRxHeader.DataLength)) {
+//				 can.cancelSending();
 //				 CAN_Received();
 //			 }
 		}
@@ -712,9 +761,10 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
 			 if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO1, &CanRxHeader, CanRxData) != HAL_OK){
 				 Error_Handler();
 			 }
-//
+
 //			 printf("1%c\n", CanRxData[0]);
 //			 if (can.receive(CanRxHeader.Identifier, CanRxData, CanRxHeader.DataLength)) {
+//				 can.cancelSending();
 //				 CAN_Received();
 //			 }
 		}

@@ -39,6 +39,8 @@ public:
     uint8_t readRegister(uint8_t addr);
     uint8_t readRegisters(uint8_t addr, uint8_t* data, uint8_t len);
 
+    bool ok;
+
 protected:
     SPI_HandleTypeDef& spi;
     GPIO_TypeDef* cs_port;
