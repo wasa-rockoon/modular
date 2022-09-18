@@ -9,14 +9,18 @@
 #define COMMAND_HPP_
 
 
+
 #include <stdint.h>
 #include <stdbool.h>
+#include <cmath>
 
 
-#define MAX_ENTRIES 12
+#ifndef MAX_ENTRIES
+#define MAX_ENTRIES 8
+#endif
 
-#define BIN_TX_QUEUE_SIZE 4
-#define HEX_TX_QUEUE_SIZE 4
+#define BIN_TX_QUEUE_SIZE 2
+#define HEX_TX_QUEUE_SIZE 2
 #define CAN_TX_QUEUE_SIZE 2
 
 union Payload {
@@ -26,6 +30,7 @@ union Payload {
 	float float_;
 };
 
+const union Payload default_payload = { .uint = 0 };
 
 struct Entry {
     uint8_t type;
@@ -39,8 +44,10 @@ struct Entry {
 
 	uint8_t encode(uint8_t* buf) const;
 	uint8_t encodeHex(uint8_t* buf) const;
-	bool decode(const uint8_t* buf, uint8_t len);
+	uint8_t decode(const uint8_t* buf);
 	uint8_t decodeHex(const uint8_t* buf);
+
+	Entry& operator=(const Entry& entry);
 };
 
 struct Command {
@@ -56,6 +63,13 @@ struct Command {
 	void setHeader(Entry header);
 	Entry getHeader() const;
 
+	float get(uint8_t type, uint8_t index, float default_) const;
+	bool get(uint8_t type, uint8_t index = 0) const;
+	bool get(uint8_t type, uint8_t index, union Payload& p) const;
+	int32_t getDiag(uint32_t& raw) const;
+
+	void addTimestamp(uint32_t time);
+
 	Command& operator=(const Command& command);
 };
 
@@ -65,8 +79,8 @@ public:
 	Queue();
 
 	inline uint8_t size() const { return size_; };
-	inline const Command& first() const { return buf[read_ptr_]; };
-	inline const Command& last() const { return buf[(write_ptr_ - 1) % N]; };
+	inline Command& first()  { return buf[read_ptr_]; };
+	inline Command& last() { return buf[(write_ptr_ - 1) % N]; };
 
 //	bool push(Command& command);
 //	bool push();
@@ -123,6 +137,7 @@ public:
 	Channel();
 
 	inline void cancelSending() { sending_ = -1; tx.pop(); };
+	inline void cancelReceiving() { receiving_ = -1; }
 
 	inline bool isReceiving() { return receiving_ != -1; };
 	inline bool isSending() { return tx.size() > 0; };
@@ -157,21 +172,5 @@ public:
 	uint8_t send(uint16_t& std_id, uint8_t* data, uint8_t& len);
 };
 
-
-class Store {
-public:
-    void init(uint32_t* index_mem, uint32_t size,
-              Entry* entries_mem, uint32_t entries_size);
-    void add(const Command& command);
-    bool get(Command& command, uint32_t index = 0);
-
-private:
-    Entry *entries_;
-    uint32_t *index_;
-    uint32_t entries_size_;
-    uint32_t size_;
-    uint32_t start_;
-    uint32_t end_;
-};
 
 #endif /* COMMAND_HPP_ */

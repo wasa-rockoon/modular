@@ -46,17 +46,17 @@ uint8_t Entry::encode(uint8_t* buf) const {
     }
 }
 
-bool Entry::decode(const uint8_t* buf, uint8_t len) {
-    type = buf[0] & 0b01111111;
-    if (len == 5 && !(buf[0] & 0b10000000)) {
-        for (int i = 0; i < 4; i++) payload.bytes[i] = buf[1 + i];
-        return true;
-    }
-    else if (len == 1 && (buf[0] & 0b10000000)) {
-        payload.uint = 0;
-        return true;
-    }
-    else return false;
+uint8_t Entry::decode(const uint8_t* buf) {
+	type = buf[0] & 0b01111111;
+
+	if ((buf[0] & 0b10000000)) {
+		payload.uint = 0;
+		return 1;
+	}
+	else {
+		for (int i = 0; i < 4; i++) payload.bytes[i] = buf[1 + i];
+		return 5;
+	}
 }
 
 uint8_t Entry::encodeHex(uint8_t* buf) const {
@@ -102,7 +102,7 @@ uint8_t Entry::decodeHex(const uint8_t* buf) {
 
     type = data[0] & 0b01111111;
 
-    if (data[0] & 0b10000000) {
+    if (data[0] & 0b1000000) {
     	payload.uint = 0;
     	return 2;
     }
@@ -117,6 +117,12 @@ uint8_t Entry::decodeHex(const uint8_t* buf) {
 		for (int i = 0; i < 4; i++) payload.bytes[i] = data[1 + i];
 		return 10;
     }
+}
+
+Entry& Entry::operator=(const Entry& entry) {
+	type = entry.type;
+	payload.uint = entry.payload.uint;
+	return *this;
 }
 
 
@@ -143,14 +149,56 @@ Entry Command::getHeader() const {
 	return header;
 }
 
+float Command::get(uint8_t type, uint8_t index, float dufault) const {
+	Payload p = { .float_ = 0.0 };
+	get(type, index, p);
+	return p.float_;
+}
+
+bool Command::get(uint8_t type, uint8_t index) const {
+	Payload p;
+	return get(type, index, p);
+}
+
+bool Command::get(uint8_t type, uint8_t index, union Payload& p) const {
+	for (int n = 0; n < size; n++) {
+		if (entries[n].type == type) {
+			if (index == 0) {
+				p = entries[n].payload;
+				return true;
+			}
+			else index--;
+		}
+	}
+	return false;
+}
+
+int32_t Command::getDiag(uint32_t& raw) const {
+	for (int n = 0; n < size; n++) {
+		uint8_t type = entries[n].type;
+		if ('0' <= type && type <= '9') {
+			raw = entries[n].payload.uint;
+			return 0b1 << (type - '0');
+		}
+	}
+	return -1;
+}
+
+void Command::addTimestamp(uint32_t time) {
+	if (size >= MAX_ENTRIES) {
+		return;
+	}
+	entries[size].set('t', time);
+	size++;
+}
+
 Command& Command::operator=(const Command& command) {
 	id = command.id;
 	to = command.to;
 	from = command.from;
 	size = command.size;
 	for (int n = 0; n < size; n++) {
-		entries[n].type = command.entries[n].type;
-		entries[n].payload = command.entries[n].payload;
+		entries[n] = command.entries[n];
 	}
 	return *this;
 }
@@ -161,8 +209,6 @@ Queue<N>::Queue() {
 	read_ptr_ = 0;
 	write_ptr_ = 0;
 }
-
-
 
 //template<uint8_t N>
 //bool Queue<N>::push(Command& command) {
@@ -251,13 +297,20 @@ CANChannel::CANChannel(): Channel() {}
 bool CANChannel::receive(uint16_t std_id, const uint8_t* data, uint8_t len) {
 
 	Entry entry;
-	if (!entry.decode(data, len)) return false;
+	uint8_t decode_len = entry.decode(data);
+	if (len != decode_len) return false;
 
 	std_id &= 0x0ff;
 
 	// Start receiving_ new command
 	if (entry.type == 0) {
 		rx.setHeader(entry);
+
+		if (rx.id == 0) {
+			return false;
+		}
+
+		if (rx.size > MAX_ENTRIES) rx.size = MAX_ENTRIES;
 		receiving_ = 0;
 	}
 	// Cancel receiving_
@@ -303,34 +356,4 @@ uint8_t CANChannel::send(uint16_t& std_id, uint8_t* data, uint8_t& len) {
 		tx.pop();
 	}
 	return tx.size();
-}
-
-
-void Store::init(uint32_t* index_mem, uint32_t size,
-          Entry* entries_mem, uint32_t entries_size) {
-    index_ = index_mem;
-    entries_ = entries_mem;
-    size_ = size;
-    entries_size_ = entries_size;
-    start_ = 0;
-    end_ = 0;
-}
-void Store::add(const Command& command) {
-    Entry header = command.getHeader();
-    entries_[index_[end_]] = header;
-
-    if (index_[end_] + command.size >= entries_size_) {
-    }
-
-    for (int n = 0; n < command.size; n++) {
-        entries_[index_[end_] + 1 + n] = command.entries[n];
-    }
-
-    if (end_ >= size_) {
-        end_ = 0;
-        start_++;
-    }
-}
-bool Store::get(Command& command, uint32_t index) {
-    
 }

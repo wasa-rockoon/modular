@@ -28,6 +28,8 @@ static const uint32_t GPSBaud = 9600;
 #define SEND_COMMAND_FREQ 1
 #define BLINK_MS 50
 
+#define GPS_SWITCH_FREQ 0.1
+
 const char ssid[] = "Rockoon-GS";
 const char pass[] = "rockoon-gs";
 const IPAddress ip(192,168,1,1);
@@ -59,6 +61,10 @@ enum class SwitchState {
 SwitchState switch_state = SwitchState::NotSelected;
 unsigned long blink_ms;
 unsigned long sent_command_ms;
+
+float launcher_lat;
+float launcher_lng;
+uint32_t launcher_gps_received;
 
 
 void setup() {
@@ -113,7 +119,6 @@ void loop() {
     gps.encode(c);
   }
 
-
   // Update location
   if (!gps.location.isValid()) {
 
@@ -139,11 +144,23 @@ void loop() {
     sendCAN();
 
     addReceivedCommand(position);
+  }
 
-    strcpy(lcd.line1, "G Lng=");
-    strcpy(lcd.line2, "G Lat= ");
+  int step = int(millis() * GPS_SWITCH_FREQ) % 1000;
+  if (step < 500 && step % 10 == 0) {
+    strcpy(lcd.line1, "GS     ");
+    snprintf(lcd.line2, 7, "%3.1fs ",
+             min((gps.location.age() / 1000.0), 999.9));
     snprintf(lcd.line1 + 6, 11, "%3.7f", gps.location.lng());
-    snprintf(lcd.line2 + 7, 10, "%2.7f", gps.location.lat());
+    snprintf(lcd.line2 + 6, 10, "%3.7f", gps.location.lat());
+    lcd.show();
+  }
+  else if (step >= 500 && step % 10 == 0) {
+    strcpy(lcd.line1, "L      ");
+    snprintf(lcd.line2, 7, "%3.1fs ",
+             min((millis() - launcher_gps_received) / 1000.0, 999.9));
+    snprintf(lcd.line1 + 6, 11, "%3.7f", launcher_lng);
+    snprintf(lcd.line2 + 6, 11, "%3.7f", launcher_lat);
     lcd.show();
   }
 
@@ -208,6 +225,18 @@ void onCANReceive(int packetSize) {
 
   if (can_channel.receive(id, data, len)) {
     addReceivedCommand(can_channel.rx);
+
+    if (can_channel.rx.id == 'n') {
+      union Payload p;
+      if (can_channel.rx.get('A', 0, p)) {
+        launcher_lat = p.float_;
+        launcher_gps_received = millis();
+      }
+      if (can_channel.rx.get('O', 0, p)) {
+        launcher_lng = p.float_;
+        launcher_gps_received = millis();
+      }
+    }
   }
 }
 

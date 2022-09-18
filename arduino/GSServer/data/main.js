@@ -3,10 +3,13 @@
 let host = ''
 host = 'http://gs.local'
 
-const LAUNCHER_MODE = true
+let LAUNCHER_MODE = false
+// LAUNCHER_MODE = true
 
 const POLLING_FREQ = 1
-const MAX_PLOT_ELEMENT = 1000
+const MAX_PLOT_ELEMENTS = 1000
+const SERVER_ERROR_MAX = 10
+const READ_FILE_BREAK = 1000
 
 let remote_index = 0;
 let local_index = 0;
@@ -14,7 +17,13 @@ let local_index = 0;
 let remote_packets = {};
 let local_packets = {};
 
+let timer1 = null;
+let timer2 = null;
+let serevr_error_count = 0;
+
 Chart.defaults.global.defaultFontColor = "#fff";
+
+let charts = null;
 
 const command_format = {
   'B': {
@@ -35,18 +44,21 @@ const command_format = {
       'H': { name: 'GPS Alt',      unit: 'm',   datatype: 'float' },
       'P': { name: 'Pressure Alt', unit: 'm',   datatype: 'float' },
       'V': { name: 'Ascent rate',  unit: 'm/s', datatype: 'float' },
-      'U': { name: 'Time',         unit: 's',   datatype: 'time' },
+      // 'U': { name: 'Time',         unit: 's',   datatype: 'time' },
       'D': { name: 'Date',       datatype: 'int' },
       'T': { name: 'Time',       datatype: 'int' },
-      'S': { name: 'Satellites', datatype: 'int' },
     }
   },
   'E': {
     name: 'Environment',
     entries: {
       'P': { name: 'Pressure',     unit: 'Pa',  datatype: 'float' },
-      'T': { name: 'Temperature',  unit: '℃',  datatype: 'float' },
+      // 'T': { name: 'Temperature',  unit: '℃',  datatype: 'float' },
+      'I': { name: 'Interiour Temp',  unit: '℃',  datatype: 'float' },
       'M': { name: 'Humidity',     unit: 'RH%', datatype: 'float' },
+      'D': { name: 'Date',       datatype: 'int' },
+      'T': { name: 'Time',       datatype: 'int' },
+      'S': { name: 'Satellites', datatype: 'int' },
     }
   },
 
@@ -71,13 +83,14 @@ const command_format = {
     entries: {
       'Q': { name: 'Quaternion',
              datatype: 'float',
-             index: ['x', 'y', 'z', 'w']
+             indexLabel: ['x', 'y', 'z', 'w']
            },
       'A': { name: 'Accel',
              unit: 'm/s^2',
              datatype: 'float',
-             index: ['x', 'y', 'z']
+             indexLabel: ['x', 'y', 'z']
            },
+      'P': { name: 'Presssure Alt', unit: 'm', datatype: 'float' },
     }
   },
   'I': {
@@ -88,11 +101,48 @@ const command_format = {
       'R': { name: 'Resistance', unit: 'Ω', datatype: 'float' },
     }
   },
+  'M': {
+    name: 'Mode',
+    entries: {
+      'N': { name: 'Launch', payload: 'No', warning: true },
+      'A': { name: 'Launch', payload: 'Allow' },
+      'S': { name: 'Mode', payload: 'Standby', warning: true },
+      'F': { name: 'Mode', payload: 'Flight' },
+      'V': { name: 'Condition', datatype: 'bytes',
+             bytes: [
+               {
+                 name: 'Pressrue Alt',
+                 enum: ['Unavailable', 'Under Min', 'Min - Std',
+                        'Std - Max', 'Over Max']
+               },
+               {
+                 name: 'GPS Alt',
+                 enum: ['Unavailable', 'Under Min', 'Min - Std',
+                        'Std - Max', 'Over Max']
+               },
+               {
+                 name: 'Condition',
+                 enum: ['No', 'OK'],
+               },
+               {
+                 name: 'Ignition',
+                 enum: ['Not Yet', 'Igniting', 'Complete']
+               }
+             ],
+           }
+  },
   'T': {
     name: 'Temperature',
     entries: {
       'I': { name: 'Igniter', unit: '℃', datatype: 'float' },
       'A': { name: 'Ambient', unit: '℃', datatype: 'float' },
+    }
+  },
+  'F': {
+    name: 'Flight Mode',
+    entries: {
+      'S': { name: 'Mode', payload: 'Standby'  },
+      'F': { name: 'Mode', payload: 'Flight' },
     }
   },
   // Telemetry and Command
@@ -103,22 +153,28 @@ const command_format = {
       'A': { name: 'Latitude',  unit: '°', datatype: 'float' },
       'H': { name: 'GPS Alt',  unit: 'm', datatype: 'float' },
       'P': { name: 'Pressure Alt',  unit: 'm', datatype: 'float' },
-    }
-  },
-  'm': {
-    name: 'Mode',
-    entries: {
-      'N': { name: 'Launch', payload: 'No', error: true },
-      'A': { name: 'Launch', payload: 'Allow' },
-      'S': { name: 'Mode', payload: 'Standby'  },
-      'F': { name: 'Mode', payload: 'Flight' },
-      'L': { name: 'Mode', payload: 'Launch' },
+      'V': { name: 'Ascent Rate',  unit: 'm/s', datatype: 'float' },
     }
   },
   'l': {
     name: 'Launcher',
     entries: {
       'V': { name: 'Battery', unit: 'V', datatype: 'float', min: 7.0 },
+      'I': { name: 'Interiour Temp',  unit: '℃',  datatype: 'float' },
+      'R': { name: 'Igniter Resistance', unit: 'Ω', datatype: 'float' },
+    }
+  },
+  'm': {
+    name: 'Mode',
+    entries: {
+      'N': { name: 'Launch', payload: 'No', warning: true },
+      'A': { name: 'Launch', payload: 'Allow' },
+      'S': { name: 'Mode', payload: 'Standby', warning: true },
+      'F': { name: 'Mode', payload: 'Flight' },
+      'i': { name: 'Min Launch Alt', unit: 'm', datatype: 'float' },
+      's': { name: 'Std Launch Alt', unit: 'm', datatype: 'float' },
+      'a': { name: 'Max Launch Alt', unit: 'm', datatype: 'float' },
+      'q': { name: 'QNH', unit: 'Pa', datatype: 'float' },
     }
   },
   's': {
@@ -143,73 +199,142 @@ const command_format = {
   // },
 }
 
-let charts = [
+let diagnostics = [
   {
-    name: 'Launcher Location',
-    local: LAUNCHER_MODE,
-    id: LAUNCHER_MODE ? 'P' : 'n',
-    x: 'O',
-    y: ['A'],
-    xLabel: 'Longitude [deg]',
-    yLabel: 'Latitude [deg]'
+    name: 'Battery',
+    status: ['Vpp', 'Vcc', 'Vdd', null],
   },
   {
-    name: 'Launcher Altitude',
-    local: LAUNCHER_MODE,
-    id: LAUNCHER_MODE ? 'P' : 'n',
-    x: 't',
-    y: ['H', 'P'],
-    xLabel: 't [s]',
-    yLabel: 'Altitude [m]'
+    name: 'Comm',
+    status: ['SD', 'LoRa', 'TWE', null],
   },
   {
-    name: 'Launcher Battery',
-    local: LAUNCHER_MODE,
-    id: LAUNCHER_MODE ? 'B' : 'l',
-    x: 't',
-    y: LAUNCHER_MODE ? ['P'] : ['V'],
-    xLabel: 't [s]',
-    yLabel: 'Voltage [V]',
-    // yMin: 6,
-    // yMax: 15
+    name: 'Sensor',
+    status: ['FP', null, null, null],
   },
   {
-    name: 'LoRa RX',
-    local: true,
-    id: 'R',
-    x: 't',
-    y: ['R'],
-    xLabel: 't [s]',
-    yLabel: 'RSSI [dBm]',
-    yMax: 0,
-  },
-];
-if (LAUNCHER_MODE) {
-  charts.concat([
-  {
-    name: 'GS Location',
-    local: true,
-    id: 'P',
-    x: 'O',
-    y: ['A'],
-    xLabel: 'Longitude [deg]',
-    yLabel: 'Latitude [deg]'
+    name: 'Igniter',
+    status: ['Bat', 'Con', 'No', 'Alt'],
   },
   {
-    name: 'GS Battery',
-    local: !LAUNCHER_MODE,
-    id: 'B',
-    x: 't',
-    y: ['P', 'C', 'D'],
-    xLabel: 't [s]',
-    yLabel: 'Voltage [V]',
-    // yMin: 0,
-    // yMax: 10,
+    name: 'Nav',
+    status: ['Loc', 'Alt', 'Pres', 'Diff'],
   },
-  ]);
+  {
+    name: 'IMU',
+    status: ['Accl', 'Gyro', 'Mag', 'Pres'],
+  },
+]
+
+function chartConfig() {
+  console.log('Chart', LAUNCHER_MODE);
+  let c = [
+    {
+      name: 'Launcher Location',
+      local: false,
+      id: LAUNCHER_MODE ? 'P' : 'n',
+      x: 'O',
+      y: ['A'],
+      xLabel: 'Longitude [deg]',
+      yLabel: 'Latitude [deg]',
+      xDataMin: 100,
+      yDataMin: 25,
+    },
+    {
+      name: 'Launcher Altitude',
+      local: false,
+      id: LAUNCHER_MODE ? 'P' : 'n',
+      x: 't',
+      y: ['H', 'P'],
+      xLabel: 't [s]',
+      yLabel: 'Altitude [m]'
+    },
+    {
+      name: 'Launcher Battery',
+      local: false,
+      id: LAUNCHER_MODE ? 'B' : 'l',
+      x: 't',
+      y: LAUNCHER_MODE ? ['P', 'C', 'D'] : ['V'],
+      xLabel: 't [s]',
+      yLabel: 'Voltage [V]',
+      yDataMax: 100,
+      // yMin: 6,
+      // yMax: 15
+    },
+    {
+      name: 'LoRa RX',
+      local: !LAUNCHER_MODE,
+      id: 'R',
+      x: 't',
+      y: ['R'],
+      xLabel: 't [s]',
+      yLabel: 'RSSI [dBm]',
+      yMax: 0,
+    },
+  ];
+  if (LAUNCHER_MODE) {
+    c = c.concat([
+      {
+        name: 'Pressure',
+        local: false,
+        id: 'E',
+        x: 't',
+        y: ['P'],
+        xLabel: 't [s]',
+        yLabel: 'Pressure [Pa]'
+      },
+      {
+        name: 'Interiour Temperature',
+        local: false,
+        id: 'E',
+        x: 't',
+        y: ['I'],
+        xLabel: 't [s]',
+        yLabel: 'Temperature [℃]'
+      },
+      {
+        name: 'Temperature',
+        local: false,
+        id: 'T',
+        x: 't',
+        y: ['I', 'A'],
+        xLabel: 't [s]',
+        yLabel: 'Temperature [℃]'
+      },
+    ])
+  }
+  else  {
+    c = c.concat([
+      {
+        name: 'GS Location',
+        local: true,
+        id: 'P',
+        x: 'O',
+        y: ['A'],
+        xLabel: 'Longitude [deg]',
+        yLabel: 'Latitude [deg]'
+      },
+      {
+        name: 'GS Battery',
+        local: true,
+        id: 'B',
+        x: 't',
+        y: ['P', 'C', 'D'],
+        xLabel: 't [s]',
+        yLabel: 'Voltage [V]',
+        // yMin: 0,
+        // yMax: 10,
+      },
+    ]);
+  }
+  return c;
 }
 
 function createCharts() {
+  charts = chartConfig();
+
+  $('#charts').empty();
+
   for (const chart of charts) {
     const canvas = $('<canvas></canvas>');
     $('#charts').append(canvas);
@@ -222,6 +347,8 @@ function createCharts() {
           entry_type: entry_type,
           label: command.entries[entry_type].name,
           data: [],
+          reducing: [],
+          reduce_rate: 1,
           showLine: true,
           fill: false,
           pointRadius: 0,
@@ -287,13 +414,53 @@ function addHistory(command) {
 
   for (chart of charts) {
     if (chart.id == command.id && chart.local == command.local) {
-      const x = command.entries.find(entry => entry.type == chart.x).payload;
+      const x_entry = command.entries.find(entry => entry.type == chart.x)
+      if (!x_entry) {
+        // console.error('Can\'t find x', chart.id, chart.x);
+        continue;
+      }
+      const x = x_entry.payload;
       chart.chart.data.datasets.forEach((dataset) => {
-        if (dataset.data.length > MAX_PLOT_ELEMENT) {
+
+        const y_entry = command.entries.find(
+          entry => entry.type == dataset.entry_type);
+        if (!y_entry) {
+          // console.error('Can\'t find y', chart.id, dataset.entry_type);
+          return;
+        }
+        const y = y_entry.payload;
+
+        if (Math.abs(x) > 1E8 || Math.abs(y) > 1E8) return;
+        if (chart.xDataMin != undefined && x < chart.xDataMin) return;
+        if (chart.xDataMax != undefined && x > chart.xDataMax) return;
+        if (chart.yDataMin != undefined && y < chart.yDataMin) return;
+        if (chart.yDataMax != undefined && y > chart.yDataMax) return;
+
+        if (dataset.reducing.length == dataset.reduce_rate) {
+          let x_reduced = 0;
+          let y_reduced = 0;
+          for (let d of dataset.reducing) {
+            x_reduced += d.x;
+            y_reduced += d.y;
+          }
+          dataset.reducing = [];
+          dataset.data.push({x: x_reduced / dataset.reduce_rate,
+                             y: y_reduced / dataset.reduce_rate});
+        }
+        else {
+          dataset.reducing.push({x, y});
+        }
+
+        if (dataset.data.length > MAX_PLOT_ELEMENTS) {
           let data = [];
+
+          dataset.reduce_rate *= 2;
+          console.log("reduce rate: ", dataset.reduce_rate);
+
           for (let i = 0; i < Math.floor(dataset.data.length / 2); i++) {
             if (i * 2 + 1 == dataset.data.length) {
               data.push(dataset.data[i * 2]);
+              break;
             }
             else {
               data.push({
@@ -302,28 +469,20 @@ function addHistory(command) {
               })
             }
           }
-          console.log('!!reduced!!', data.length);
+          console.log('reduced', data.length, dataset.reduce_rate);
           dataset.data = data;
         }
-        const y = command.entries.find(
-          entry => entry.type == dataset.entry_type).payload;
-        if (Math.abs(x) > 1E10 || Math.abs(y) > 1E10) return;
-        dataset.data.push({x, y});
       })
-      chart.chart.update();
     }
   }
 }
 
 function main() {
-  setInterval(() => {
-    fetch(true);
-    setTimeout(() => {
-      fetch(false);
-    }, 1000 / POLLING_FREQ / 2);
-  }, 1000 / POLLING_FREQ);
+  fetchStart();
 
   $('#connection-error').hide();
+  $('#retry-button').on('click', fetchStart);
+  $('#select-file').on('change', readFile);
 
   // let sample_format = command_format['Sample'];
   // let sample = { name: sample_format.name, id: 'S', to: 'G', from: 'G',
@@ -340,19 +499,76 @@ function main() {
   render();
 }
 
+function readFile() {
+  fetchCancel();
+
+  var file = $('#select-file')[0].files[0];
+  if(!file) {
+    alert('No file');
+    return;
+  }
+  var reader = new FileReader();
+  reader.readAsText(file);
+  reader.onload = () => {
+    const lines = reader.result.split('\n').filter(line => line != "");
+    console.log('File read', lines.length);
+    LAUNCHER_MODE = true;
+    createCharts();
+
+    const local = false;
+
+    lines.forEach((line, i) => {
+      addHexCommand(line, local);
+      if (i % READ_FILE_BREAK == 0) {
+        console.log(`${i} / ${lines.length}`);
+        render(local);
+        updateChart();
+      }
+    });
+
+
+    addHexCommands('0\n' + reader.result, false);
+
+    setTimeout(() => {
+      fetchCancel();
+      $('#connection-error').hide();
+    }, 1000)
+
+  }
+}
+
+function fetchStart() {
+  $('#retry-button').hide();
+  serevr_error_count = 0;
+
+  fetchCancel();
+
+  timer1 = setInterval(() => {
+    fetch(true);
+    timer2 = setTimeout(() => {
+      fetch(false);
+    }, 1000 / POLLING_FREQ / 2);
+  }, 1000 / POLLING_FREQ);
+}
+
+function fetchCancel() {
+  if (timer1) clearInterval(timer1);
+  if (timer2) clearTimeout(timer2);
+}
+
 function fetch(local) {
   // local_packets['Sample'].updated = true;
 
-  if (local) {
+  // if (local | true) {
     for (let id in local_packets) {
       local_packets[id].updated = false;
     }
-  }
-  else {
+  // }
+  // else {
     for (let id in remote_packets) {
       remote_packets[id].updated = false;
     }
-  }
+  // }
 
   // if (local) console.log('fetch local',  local_index);
   // else console.log('fetch remote',  remote_index);
@@ -364,40 +580,68 @@ function fetch(local) {
     dataType: 'text',
     async: true,
     cache: false,
-    timeout: 1000 / POLLING_FREQ}).then((str) => {
-      $('#connection-error').hide();
-
-      const lines = str.split('\n').filter(line => line != "");
-
-      console.log('returned', parseInt(lines[0]));
-
-      if (local) local_index = parseInt(lines[0]);
-      else remote_index = parseInt(lines[0]);
-
-      lines.shift();
-
-      const commands = lines.map(parseCommandHex);
-      // console.log(commands);
-
-      commands.forEach((command, i) => {
-        // console.log('command ' + ((local ? local_index : remote_index ) + i),
-        //             command);
-        command.updated = true;
-        command.date = new Date();
-        command.local = local;
-
-        addHistory(command);
-
-        if (local) local_packets[command.id] = command;
-        else remote_packets[command.id] = command;
-      });
-
-      render(local);
-    }).catch((e) => {
+    timeout: 1000 / POLLING_FREQ})
+    .then(str => {
+      addHexCommands(str, local);
+      render(LAUNCHER_MODE ? !local : local);
+      updateChart();
+    })
+    .catch(e => {
       $('#connection-error').show();
-      console.error(e);
+      serevr_error_count++;
+      if (serevr_error_count > SERVER_ERROR_MAX) {
+        fetchCancel();
+        $('#retry-button').show();
+      }
+
+      console.error(e.statusText);
       render(local);
     });
+}
+
+function addHexCommands(str, local) {
+  $('#connection-error').hide();
+  serevr_error_count = 0;
+
+  const lines = str.split('\n').filter(line => line != "");
+
+  console.log('returned', parseInt(lines[0]));
+
+  if (local) local_index = parseInt(lines[0]);
+  else remote_index = parseInt(lines[0]);
+
+  lines.shift();
+
+  lines.forEach((line, _) => {
+    let command = addHexCommand(line, local);
+    if (lines.length < 50) {
+        console.log(command);
+    }
+  });
+}
+
+function addHexCommand(line, local) {
+  let command = parseCommandHex(line);
+
+  if (!command) return null;
+
+  if (LAUNCHER_MODE) local = !local;
+
+  command.updated = true;
+  command.local = local;
+
+  addHistory(command);
+
+  if (local) local_packets[command.id] = command;
+  else remote_packets[command.id] = command;
+
+  return command;
+}
+
+function updateChart() {
+  for (chart of charts) {
+    chart.chart.update();
+  }
 }
 
 function render(local) {
@@ -408,49 +652,115 @@ function render(local) {
   if (local) {
     $('#local-packets').empty();
     for (let id in local_packets) {
-      $('#local-packets').append(commandItem(local_packets[id]));
+      commandItem(local_packets[id]).appendTo('#local-packets');
     }
   }
   else {
     $('#remote-packets').empty();
     for (let id in remote_packets) {
-      $('#remote-packets').append(commandItem(remote_packets[id]));
+      commandItem(remote_packets[id]).appendTo('#remote-packets');
     }
   }
 }
 
 function commandItem(command) {
-  return `<table class="pure-table pure-table-horizontal command
+  let entries = [];
+  let diagnostics = [];
+
+  for (const entry of command.entries) {
+    if (entry.datatype == 'diag') diagnostics.push(entry)
+    else entries.push(entry);
+  }
+
+  const dom =
+        $(`<table class="pure-table pure-table-horizontal command
                          ${command.updated ? 'updated' : ''}">
             <thead>
                <tr>
-                 <th>${command.name}</th>
-                 <th>${showTime(command.t)}</th>
+                 <th colspan="3">${command.name}</th>
+                 <th colspan="2">${showTime(command.t)}</th>
                </tr>
             </thead>
-            ${command.entries.map(entryItem).join('\n')}
-          </table>`
+            ${entries.map(entryItem).join('\n')}
+            ${diagnostics.map(diagnosticsItem).join('\n')}
+          </table>`);
+  dom.on('click', () => { console.log(command); });
+  return dom;
 }
 function entryItem(entry) {
   if (entry.type == 't') return '';
 
-  let payload = entry.payload;
-  if (entry.datatype == 'float')
-    payload = String(entry.payload).slice(0, 11);
-  else if (entry.datatype == 'time')
-    payload = payload.toLocaleTimeString('ja-JP');
+  if (entry.datatype == 'bytes') {
+    let dom = '';
+    entry.payload.forEach((payload, i) => {
+      let format = entry.bytes[i];
+      if (format.enum) {
+        payload = format.enum[payload];
+      }
+      dom +=
+        `<tr>
+           <td colspan="2">${format.name}</td>
+           <td>${format.unit ? '[' + format.unit + ']' : ''}</td>
+           <td colspan="2">${payload == null ? '' : payload}</td>
+         </tr>`;
+    })
+    return dom;
+  }
+  else {
+    let payload = entry.payload;
+    switch (entry.datatype) {
+    case 'float':
+      payload = String(entry.payload).slice(0, 9);
+      break;
+    case 'time':
+      payload = payload.toLocaleTimeString('ja-JP');
+    default:
+      break;
+    }
 
-  let normal = entry.normal;
-  if (normal && entry.datatype == 'float') normal = normal.toFixed(4);
+    let class_ = `${entry.error ? 'error' : ''}`
 
-  return `<tr class="${entry.error ? 'error' : ''}">
-            <td>${entry.name} ${entry.unit ? '[' + entry.unit + ']' : ''}</td>
-            <td>${payload == null ? '' : payload}</td>
+    let index = '';
+    if (Array.isArray(entry.indexLabel))
+      index = entry.indexLabel[entry.index];
+    else if (entry.indexLabel)
+      index = String(entry.index);
+
+    return `<tr class="${class_}">
+            <td colspan="2">${entry.name} ${index}</td>
+            <td>${entry.unit ? '[' + entry.unit + ']' : ''}</td>
+            <td colspan="2">${payload == null ? '' : payload}</td>
           </tr>`;
+  }
+
+}
+function diagnosticsItem(entry) {
+  if (entry.type == 't') return '';
+
+  let dom = '';
+
+  function light(name, error) {
+    if (name == null) name = '';
+    return `<td class="${error ? 'error' : ''}">${name}</td>`;
+  }
+
+  // console.log(entry);
+
+  diagnostics.forEach((format, n) => {
+    let module = entry.modules[n];
+    dom += `<tr class="diag"> ${light(format.name, module.error)}`;
+    format.status.forEach((f, i) => {
+      dom += light(f, module.status[i] || module.error);
+    })
+    dom += `</tr>`;
+  })
+
+  return dom;
 }
 
 function parseCommandHex(line) {
   const hexes = line.replace(/\r?\n/g, '').match(/.{2}/g);
+  if (!hexes) return null;
   const bytes = hexes.map(hex => parseInt(hex, 16));
 
   const id = String.fromCharCode(bytes[1]);
@@ -464,13 +774,18 @@ function parseCommandHex(line) {
                  hex: line, t: null,
                  entries: []}
 
+  let indices = {};
+
   let i = 5;
   while (true) {
     if (i >= bytes.length) break;
 
     const type = String.fromCharCode(bytes[i] & 0b01111111);
 
-    let entry = {type: type};
+    const index = indices[type] == undefined ? 0 : indices[type] + 1;
+    indices[type] = index;
+
+    let entry = {type, index};
 
     if (format && format.entries[type]) {
       Object.assign(entry, format.entries[type]);
@@ -479,54 +794,83 @@ function parseCommandHex(line) {
       entry.name = type;
     }
 
+    if ('0' <= type && type <= '9') entry.datatype = 'diag';
+
+
+    let buf = new ArrayBuffer(4);
+    let view = new DataView(buf);
 
     if (bytes[i] & 0b10000000) {
-      i += 1;
       if (entry.payload == undefined) {
-        entry.payload = 0;
+        view.setUint32(0, 0);
       }
+
+      i += 1;
     }
     else {
-      let buf = new ArrayBuffer(4);
-      let view = new DataView(buf);
       for (let n = 0; n < 4; n++) {
         view.setUint8(3 - n, bytes[i + n + 1]);
       }
 
-      if (entry.payload != undefined) {
-      }
-      else if (type == 't') {
-        entry.payload = view.getUint32(0) / 1000.0;
-        command.t = entry.payload;
-      }
-      else if (format && format.entries[type]) {
-        switch (format.entries[type].datatype) {
-        case 'float':
-          entry.payload = view.getFloat32(0);
-          break;
-        case 'int':
-          entry.payload = view.getInt32(0);
-          break;
-        case 'uint':
-          entry.payload = view.getUint32(0);
-          break;
-        case 'time':
-          entry.payload = new Date(view.getUint32(0) * 1000);
-          break;
-        case undefined:
-          entry.payload = null;
-          break;
-        default:
-          entry.payload = line.slice(i * 2 + 2, i * 2 + 12);
-          break;
-        }
-      }
-      else {
-        entry.payload = line.slice(i * 2 + 2, i * 2 + 12);
-      }
-
       i += 5;
     }
+
+    if (entry.payload != undefined) {
+    }
+    else if (type == 't') {
+      entry.payload = view.getUint32(0) / 1000.0;
+      command.t = entry.payload;
+    }
+    else if (entry.datatype) {
+      switch (entry.datatype) {
+      case 'float':
+        entry.payload = view.getFloat32(0);
+        break;
+      case 'int':
+        entry.payload = view.getInt32(0);
+        break;
+      case 'uint':
+        entry.payload = view.getUint32(0);
+        break;
+      case 'time':
+        entry.payload = new Date(view.getUint32(0) * 1000);
+        break;
+      case 'bytes':
+        entry.payload = [0, 1, 2, 3].forEach(i => view.getUint8(3 - i));
+        break;
+      case 'diag':
+        entry.payload = view.getUint32(0);
+        const modules = view.getUint8(0);
+
+        const status_bits = [];
+        for (let n = 0; n < 3; n++) {
+          status_bits.push((view.getUint8(3 - n) & 0b1111));
+          status_bits.push((view.getUint8(3 - n) >>> 4) & 0b1111);
+        }
+
+        entry.modules = [];
+        for (let n = 0; n < diagnostics.length; n++) {
+          let s = [];
+          for (let i = 0; i < 4; i++) {
+            s.push(((status_bits[n] & (1 << i)) != 0));
+          }
+          entry.modules.push({
+            error: (modules & (1 << n)) != 0,
+            status: s,
+          })
+          // console.log(modules.toString(2), entry, entry.payload.toString(2), status_bits);
+          // fetchCancel();
+        }
+        break;
+      default:
+        entry.payload = line.slice(i * 2 + 2, i * 2 + 12);
+        break;
+      }
+    }
+    else {
+      entry.payload = line.slice(i * 2 + 2, i * 2 + 12);
+    }
+
 
     command.entries.push(entry);
   }
