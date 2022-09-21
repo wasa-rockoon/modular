@@ -53,6 +53,10 @@
 #define VDD_FIX (3.35 / 3.23)
 
 #define VPP_V_MIN 7.0
+#define VCC_V_MIN 4.9
+#define VCC_V_MAX 5.1
+#define VDD_V_MIN 3.2
+#define VDD_V_MAX 3.4
 
 #define CAN_SEND_TIMEOUT_TICK 20
 
@@ -136,9 +140,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     	vdd_A = vdd_A * (1 - CURRENT_FILTER_A) + vdd_A_ * CURRENT_FILTER_A;
 
     	diag.setStatus(STATUS_0, vpp_V < VPP_V_MIN);
-    	diag.update(HAL_GetTick());
+    	diag.setStatus(STATUS_1, vcc_V < VCC_V_MIN || VCC_V_MAX < vcc_V);
+    	diag.setStatus(STATUS_2, vdd_V < VDD_V_MIN || VDD_V_MAX < vdd_V);
     }
     else if (htim == &htim14) {
+    	diag.update(HAL_GetTick());
+
 #ifdef DEBUG
 		printf("Vpp: %d.%03d V\n", (int)vpp_V, abs((int)(vpp_V * 1000) % 1000));
 		printf("Vcc: %d.%03d V, %d mA\n", (int)vcc_V, abs((int)(vcc_V * 1000) % 1000), (int)(vcc_A * 1000));

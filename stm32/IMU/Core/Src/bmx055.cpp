@@ -146,10 +146,10 @@ Vec3 Accelerometer::read() {
     uint8_t data[6];
     readRegisters(2, data, 6);
 
-//    ok = false;
-//    for (int i = 0; i < 6; i++) {
-//    	ok = ok || (data[i] != 0);
-//    }
+    ok = false;
+    for (int i = 0; i < 6; i++) {
+    	ok = ok || (data[i] != 0);
+    }
 
     // Convert the data to 12-bits
     int x = ((unsigned)data[1] << 4) + ((unsigned)data[0] >> 4);
@@ -171,10 +171,10 @@ Vec3 Gyroscope::read() {
     uint8_t data[6];
     readRegisters(2, data, 6);
 
-//    ok = false;
-//    for (int i = 0; i < 6; i++) {
-//    	ok = ok || (data[i] != 0);
-//    }
+    ok = false;
+    for (int i = 0; i < 6; i++) {
+    	ok = ok || (data[i] != 0);
+    }
 
     // Convert the data
     int x = ((unsigned)data[1] << 8) + (unsigned)data[0];
@@ -214,11 +214,11 @@ Magnetometer::Magnetometer(SPI_HandleTypeDef& spi, GPIO_TypeDef* cs_port, uint16
 Vec3 Magnetometer::read() {
     uint8_t data[6];
     readRegisters(0x42, data, 6);
-//
-//    ok = false;
-//    for (int i = 0; i < 6; i++) {
-//    	ok = ok || (data[i] != 0);
-//    }
+
+    ok = false;
+    for (int i = 0; i < 6; i++) {
+    	ok = ok || (data[i] != 0);
+    }
 
     // Convert the data
     int x = ((unsigned)data[1] << 5) + ((unsigned)data[0] >> 3);

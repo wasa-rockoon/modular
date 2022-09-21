@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 
-#define DIAG_TIMEOUT_TICK 5000
+#define DIAG_TIMEOUT_TICK 10000
 
 #define MAX_MODULES 6
 #define STATUS_SIZE 4

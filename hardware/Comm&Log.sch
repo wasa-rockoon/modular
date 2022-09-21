@@ -17535,8 +17535,8 @@ SD_SW: 12 -&gt; 13</text>
 <instance part="GND2" gate="1" x="195.58" y="68.58" smashed="yes">
 <attribute name="VALUE" x="193.04" y="66.04" size="1.778" layer="96"/>
 </instance>
-<instance part="GND3" gate="1" x="266.7" y="68.58" smashed="yes">
-<attribute name="VALUE" x="264.16" y="66.04" size="1.778" layer="96"/>
+<instance part="GND3" gate="1" x="274.32" y="68.58" smashed="yes">
+<attribute name="VALUE" x="271.78" y="66.04" size="1.778" layer="96"/>
 </instance>
 <instance part="GND4" gate="1" x="238.76" y="-40.64" smashed="yes">
 <attribute name="VALUE" x="236.22" y="-43.18" size="1.778" layer="96"/>
@@ -17760,8 +17760,8 @@ SD_SW: 12 -&gt; 13</text>
 </segment>
 <segment>
 <pinref part="ES920LR" gate="G$1" pin="GND@26"/>
-<wire x1="251.46" y1="73.66" x2="266.7" y2="73.66" width="0.1524" layer="91"/>
-<wire x1="266.7" y1="73.66" x2="266.7" y2="71.12" width="0.1524" layer="91"/>
+<wire x1="251.46" y1="73.66" x2="274.32" y2="73.66" width="0.1524" layer="91"/>
+<wire x1="274.32" y1="73.66" x2="274.32" y2="71.12" width="0.1524" layer="91"/>
 <pinref part="GND3" gate="1" pin="GND"/>
 </segment>
 <segment>
@@ -18444,13 +18444,14 @@ SD_SW: 12 -&gt; 13</text>
 <pinref part="R6" gate="G$1" pin="2"/>
 </segment>
 </net>
-<net name="N$1" class="0">
+<net name="920_!RESET!" class="0">
 <segment>
 <pinref part="ES920LR" gate="G$1" pin="RESETB"/>
 <wire x1="251.46" y1="68.58" x2="254" y2="68.58" width="0.1524" layer="91"/>
+<label x="254" y="68.58" size="1.778" layer="95" xref="yes"/>
 </segment>
 </net>
-<net name="N$2" class="0">
+<net name="920_TRX_" class="0">
 <segment>
 <pinref part="R8" gate="G$1" pin="2"/>
 <pinref part="U$2" gate="G$1" pin="P7"/>
@@ -18471,7 +18472,7 @@ SD_SW: 12 -&gt; 13</text>
 <wire x1="137.16" y1="45.72" x2="121.92" y2="45.72" width="0.1524" layer="91"/>
 </segment>
 </net>
-<net name="N$5" class="0">
+<net name="920_RTX_" class="0">
 <segment>
 <pinref part="R7" gate="G$1" pin="2"/>
 <pinref part="U$2" gate="G$1" pin="P5"/>

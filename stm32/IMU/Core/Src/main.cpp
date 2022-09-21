@@ -25,7 +25,7 @@
 #include "command.hpp"
 #include "diagnostics.hpp"
 #include "bmx055.hpp"
-#include "bmp280.hpp"
+//#include "bmp280.hpp"
 #include "algebra.hpp"
 #include "madgwick.h"
 /* USER CODE END Includes */
@@ -37,10 +37,21 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+//#define CALIB
+
+#define CALIB_GAIN 0.000001
+
+
 #define CAN_SEND_TIMEOUT_TICK 10
 
 #define SAMPLE_FREQ 100
 #define LOG_FREQ 10
+//#define LOG_FREQ 5
+
+
+const Vec3 mag_center = Vec3(0.4, 0.15, -1.4);
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -66,7 +77,7 @@ Diagnostics diag(MODULE_IMU);
 BMX055 bmx055(hspi2, CS_ACCL_GPIO_Port, CS_ACCL_Pin,
 		  	  	  	   CS_GYRO_GPIO_Port, CS_GYRO_Pin,
 					   CS_MAG_GPIO_Port, CS_MAG_Pin);
-BMP280 bmp280(hspi2, CS_PRES_GPIO_Port, CS_PRES_Pin);
+//BMP280 bmp280(hspi2, CS_PRES_GPIO_Port, CS_PRES_Pin);
 
 
 Madgwick madgwick_filter;
@@ -93,7 +104,11 @@ Quaternion q_s2b;
 float qnh_pa = 101325;
 
 bool bmx055_ok;
-bool bmp280_ok;
+bool bmp280_ok = true;
+
+float radius;
+
+int count;
 
 /* USER CODE END PV */
 
@@ -121,10 +136,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if (htim == &htim3) {
     	// Sample
 
-    	if (!bmx055_ok || !bmp280_ok) return;
+    	count++;
+
+//    	if (!bmx055_ok || !bmp280_ok) return;
 
     	accel = bmx055.Accl.read();
-//    	gyro = bmx055.Gyro.read();
+    	gyro = bmx055.Gyro.read();
     	mag = bmx055.Mag.read();
 
     	madgwick_filter.update(
@@ -138,52 +155,89 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
     	accel_avg += accel;
 
+#ifdef CALIB
+    	radius = bmx055.Mag.calibrate(mag, CALIB_GAIN);
+#endif
+
     }
     else if (htim == &htim4) {
     	if (!bmx055_ok || !bmp280_ok) return;
 
     	// Log
 
-    	p_altitude = bmp280.readAltitude(qnh_pa / 100.0);
+//    	p_altitude = bmp280.readAltitude(qnh_pa / 100.0);
 
     	accel_avg *= (float)LOG_FREQ / (float)SAMPLE_FREQ;
 
 
     	diag.setStatus(STATUS_0, !bmx055.Accl.ok);
-    	diag.setStatus(STATUS_1, !bmx055.Gyro.ok || true);
+    	diag.setStatus(STATUS_1, !bmx055.Gyro.ok);
     	diag.setStatus(STATUS_2, !bmx055.Mag.ok);
     	diag.setStatus(STATUS_3, !bmp280_ok);
     	diag.update(HAL_GetTick());
 
-
-    	Command att('A', 0, 0, 8);
-    	att.entries[0].set('Q', (float)q_i2b.b);
-    	att.entries[1].set('Q', (float)q_i2b.c);
-    	att.entries[2].set('Q', (float)q_i2b.d);
-    	att.entries[3].set('Q', (float)q_i2b.a);
-    	att.entries[4].set('A', (float)accel_avg.x);
-    	att.entries[5].set('A', (float)accel_avg.y);
-    	att.entries[6].set('A', (float)accel_avg.z);
-    	att.entries[7].set('0' + MODULE_IMU_N, (uint32_t)diag.encode());
-
-    	can.tx.push(att);
+    	Command att1('A', 0, 0, 6);
+    	att1.entries[0].set('A', (float)accel.x);
+    	att1.entries[1].set('A', (float)accel.y);
+    	att1.entries[2].set('A', (float)accel.z);
+    	att1.entries[3].set('G', (float)gyro.x);
+    	att1.entries[4].set('G', (float)gyro.y);
+    	att1.entries[5].set('G', (float)gyro.z);
+    	can.tx.push(att1);
 
     	CAN_Send();
+
+
+    	Command att2('a', 0, 0, 4);
+    	att2.entries[0].set('M', (float)mag.x);
+    	att2.entries[1].set('M', (float)mag.y);
+    	att2.entries[2].set('M', (float)mag.z);
+    	att2.entries[3].set('0' + MODULE_IMU_N, (uint32_t)diag.encode());
+    	can.tx.push(att2);
+
+    	CAN_Send();
+
+//    	Command att('A', 0, 0, 8);
+//    	att.entries[0].set('Q', (float)q_i2b.b);
+//    	att.entries[1].set('Q', (float)q_i2b.c);
+//    	att.entries[2].set('Q', (float)q_i2b.d);
+//    	att.entries[3].set('Q', (float)q_i2b.a);
+//    	att.entries[4].set('A', (float)accel_avg.x);
+//    	att.entries[5].set('A', (float)accel_avg.y);
+//    	att.entries[6].set('A', (float)accel_avg.z);
+//    	att.entries[7].set('0' + MODULE_IMU_N, (uint32_t)diag.encode());
+
+//    	can.tx.push(att);
+//
+//    	CAN_Send();
 
     	accel_avg = Vec3::zero;
 
 #ifdef DEBUG
     	char buf[64];
-    	accel.show(buf);
+    	q_i2b.inverse().rotate(accel).show(buf);
+    	printf("%d \n", count);
+//    	accel.show(buf);
     	printf("A %s\n", buf);
-    	gyro.show(buf);
-    	printf("G %s\n", buf);
-    	mag.show(buf);
-    	printf("M %s\n", buf);
+//    	gyro.show(buf);
+//    	printf("G %s\n", buf);
+//    	mag.show(buf);
+//    	printf("M %s\n", buf);
 
-    	printf("H %d\n", (int)(p_altitude));
+    	printf("%c\n, buf");
 
-    	diag.printSummary();
+    	printf("P: %d   ", (int)madgwick_filter.getPitch());
+    	printf("Y: %d   ", (int)madgwick_filter.getYaw());
+    	printf("R: %d\n", (int)madgwick_filter.getRoll());
+
+//    	printf("H %d\n", (int)(p_altitude));
+
+    	//    	diag.printSummary();
+
+#ifdef CALIB
+    	bmx055.Mag.center.show(buf);
+    	printf("C %d %s\n", (int)(radius * 1000000), buf);
+#endif
 #endif
 
     	HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
@@ -254,20 +308,25 @@ int main(void)
 //  HAL_Delay(1000);
 
   bmx055_ok = bmx055.begin();
-  bmp280_ok = bmp280.begin();
-
-  bmx055_ok = bmx055.begin();
 //  bmp280_ok = bmp280.begin();
+
+//  bmx055_ok = bmx055.begin();
+//  bmp280_ok = bmp280.begin();
+
+  bmx055.Mag.center = mag_center;
 
 #ifdef DEBUG
   printf("%d %d \n", bmx055_ok, bmp280_ok);
 #endif
 
-  bmp280.setSampling(BMP280::MODE_NORMAL,     /* Operating Mode. */
-		  	  	     BMP280::SAMPLING_X2,     /* Temp. oversampling */
-					 BMP280::SAMPLING_X16,    /* Pressure oversampling */
-					 BMP280::FILTER_X16,      /* Filtering. */
-					 BMP280::STANDBY_MS_500); /* Standby time. */
+  bmx055.Gyro.setRange(PM2000DPS);
+  bmx055.Accl.setRange(PM16G);
+//
+//  bmp280.setSampling(BMP280::MODE_NORMAL,     /* Operating Mode. */
+//		  	  	     BMP280::SAMPLING_X2,     /* Temp. oversampling */
+//					 BMP280::SAMPLING_X16,    /* Pressure oversampling */
+//					 BMP280::FILTER_X16,      /* Filtering. */
+//					 BMP280::STANDBY_MS_500); /* Standby time. */
 
   madgwick_filter.begin(SAMPLE_FREQ);
 

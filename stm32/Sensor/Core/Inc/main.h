@@ -66,6 +66,8 @@ void Error_Handler(void);
 #define IG_TEMP_GPIO_Port GPIOB
 #define FLIGHT_PIN_Pin GPIO_PIN_10
 #define FLIGHT_PIN_GPIO_Port GPIOA
+#define CHARGE_Pin GPIO_PIN_5
+#define CHARGE_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

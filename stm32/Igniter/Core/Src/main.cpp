@@ -25,7 +25,9 @@
 
 #include <stdlib.h>
 #include <cstdio>
+#include <limits>
 #include "command.hpp"
+#include "shared.hpp"
 #include "diagnostics.hpp"
 
 /* USER CODE END Includes */
@@ -40,9 +42,27 @@
 
 #define SAMPLE_FREQ 100
 #define TLM_FREQ 1
+#define IGNITING_TLM_FREQ 10
+
+#define TEST_ENABLE
+#define TEST_MS 50
+
+#define IGNITION_MIN_TICK 10000
+#define IGNITION_MAX_TICK 30000
+#define RETRY_TICK 30000
+#define LAUNCH_CONFIRM_KEEP_TICK 15000
+
+#define IGNITER_RESISTANCE_HIZ 20
+#define IGNITER_RESISTANCE_MAX 20
+#define IGNITER_RESISTANCE_OFFSET 0.6
+#define IGNITER_RESISTANCE_FIX (10.0 / 8.5)
+#define IGNITER_VOLTAGE_MAX 1.8
 
 //#define LAUNCH_CONFIRM_TIMEOUT_TICK 2000
-#define LAUNCH_CONFIRM_KEEP_TICK 5000
+//#define ALTITUDE_ALIVE_TICK 1000
+
+
+#define IGNITER_CURRENT_OFFSET -0.25
 
 #define BATTERY_V_MIN 5.0
 
@@ -84,12 +104,62 @@ uint16_t adc_values[12];
 float battery_voltage;
 float igniter_current;
 float igniter_voltage;
+float igniter_resistance;
 
-bool launch_ok = false;
-bool launch_confirm_tick;
 
-uint32_t count = 0;
+Shared<float> press_alt;
+Shared<float> gps_alt;
+Shared<bool> flight_mode = false;
+Shared<bool> launch_ok = false;
+
+bool launch_ready = false;
+bool launch_condition = false;
+bool igniter_connected = false;
 bool ignite = false;
+bool testing = false;
+
+uint32_t ignited_tick;
+
+float launch_alt_min = 10000;
+float launch_alt_std = 20000;
+float launch_alt_max = 23000;
+
+enum LaunchCondition {
+	SensorUnavailable = 0,
+	UnderMin = 1,
+	Min_Std = 2,
+	Std_Max = 3,
+	OverMax = 4,
+};
+
+LaunchCondition press_condition = SensorUnavailable;
+LaunchCondition gps_condition = SensorUnavailable;
+
+enum State {
+	NoLaunch = 0,
+	StandBy,
+	CountDown,
+	Igniting,
+	Cancel,
+	Complete,
+};
+
+
+State state = NoLaunch;
+
+uint32_t state_tick = 0;
+
+int8_t count;
+
+
+//enum IgnitionStatus {
+//	NotYet = 0,
+//	Igniting = 1,
+//	Complete = 2,
+//};
+//
+//IgnitionStatus ignition_status = NotYet;
+
 
 /* USER CODE END PV */
 
@@ -117,27 +187,93 @@ void CAN_Received();
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim == &htim2) {
-    	volatile float voltages[10];
-    	for (int i = 0; i < 10; i++) {
+    	volatile float voltages[3];
+    	for (int i = 0; i < 3; i++) {
     		voltages[i] = (float)adc_values[i] * 3.3 / 4095;
 
 //    		printf("%d %d\n", i, (int)(voltages[i] * 1000));
     	}
 
     	battery_voltage = voltages[0] * 11.0;
-    	igniter_current = voltages[1];
-    	igniter_voltage = voltages[2];
+    	igniter_current = (voltages[1] - 3.3 / 2.0) / 0.110 - IGNITER_CURRENT_OFFSET;
+    	igniter_voltage = voltages[2] / 16.0;
 
-    	count++;
+//    	printf("CI: %c%d.%03d A\n",
+//    			igniter_current > 0 ? ' ' : '-', (int)igniter_current, abs((int)(igniter_current * 1000) % 1000));
+
+
+    	if (ignite) {
+    		igniter_resistance = battery_voltage / igniter_current;
+    	}
+    	else {
+    		if (voltages[2] >= IGNITER_VOLTAGE_MAX)
+    	    		igniter_resistance = 1E9;
+    	    else igniter_resistance = (470 * igniter_voltage / (3.3 - igniter_voltage) - IGNITER_RESISTANCE_OFFSET) * IGNITER_RESISTANCE_FIX;
+    	}
+
+    	igniter_connected = igniter_resistance < IGNITER_RESISTANCE_MAX;
+
+
+    	if (flight_mode.isValid()) {
+    		launch_ready = launch_ok && flight_mode;
+    	}
+    	else {
+    		launch_ready = false;
+    	}
+
+
+    	if (press_alt.isValid()) {
+    		if      (press_alt < launch_alt_min) press_condition = UnderMin;
+    		else if (press_alt < launch_alt_std) press_condition = Min_Std;
+    		else if (press_alt < launch_alt_max) press_condition = Std_Max;
+    		else                                 press_condition = OverMax;
+    	}
+    	else {
+    		press_condition = SensorUnavailable;
+    	}
+
+    	if (gps_alt.isValid()) {
+    		if      (gps_alt < launch_alt_min) gps_condition = UnderMin;
+    		else if (gps_alt < launch_alt_std) gps_condition = Min_Std;
+    		else if (gps_alt < launch_alt_max) gps_condition = Std_Max;
+    		else                               gps_condition = OverMax;
+    	}
+    	else {
+    		gps_condition = SensorUnavailable;
+    	}
+
+
+    	launch_condition = false;
+
+    	if (press_condition == SensorUnavailable && gps_condition == Std_Max) {
+    		launch_condition = true;
+    	}
+    	if (gps_condition == SensorUnavailable && press_condition == Std_Max) {
+    		launch_condition = true;
+    	}
+
+
+    	if (press_condition >= Std_Max && gps_condition >= Std_Max) {
+    		launch_condition = true;
+    	}
+
+    	if (press_condition == OverMax && gps_condition >= Min_Std) {
+    		launch_condition = true;
+    	}
+    	if (gps_condition == OverMax && press_condition >= Min_Std) {
+    		launch_condition = true;
+    	}
+
+
 
 
 #ifndef DEBUG
 	  HAL_IWDG_Refresh(&hiwdg);
 #endif
     }
-    else if (htim == &htim14) {
-
-    }
+//    else if (htim == &htim14) {
+//
+//    }
 }
 
 void CAN_Received() {
@@ -145,13 +281,32 @@ void CAN_Received() {
 	int32_t mid = can.rx.getDiag(raw);
 	if (mid >= 0) diag.update(mid, raw, HAL_GetTick());
 
-	if (can.rx.id == 'm') {
-		if (can.rx.get('N')) launch_ok = false;
-		else if (can.rx.get('A')) {
-			if (!launch_ok) launch_confirm_tick = HAL_GetTick();
-			launch_ok = true;
-		}
+//	printf("%c\n", can.rx.id);
+
+	switch (can.rx.id) {
+
+	case 'm':
+		launch_ok.setIf('N', can.rx, false);
+		launch_ok.setIf('A', can.rx, true);
+//		printf("MODE\n", can.rx.id);
+		break;
+
+	case 'F':
+		flight_mode.setIf('S', can.rx, false);
+		flight_mode.setIf('F', can.rx, true);
+//		printf("FLIGHT\n", can.rx.id);
+		break;
+
+	case 'P':
+		press_alt.set('P', can.rx);
+		gps_alt.set('H', can.rx);
+		break;
 	}
+}
+
+void ChangeState(State s) {
+	state = s;
+	state_tick = HAL_GetTick();
 }
 
 /* USER CODE END 0 */
@@ -203,7 +358,7 @@ int main(void)
   HAL_ADCEx_Calibration_Start(&hadc);
   HAL_ADC_Start_DMA(&hadc, (uint32_t*)adc_values, 12);
 
-  HAL_Delay(900);
+  HAL_Delay(770);
 
   HAL_TIM_Base_Start_IT(&htim2);
   HAL_TIM_PWM_Start(&htim14, TIM_CHANNEL_1);
@@ -219,36 +374,99 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
-	  // Launch
-	  if (launch_ok &&
-			  HAL_GetTick() - launch_confirm_tick > LAUNCH_CONFIRM_KEEP_TICK &&
-			  battery_voltage > BATTERY_V_MIN) {
-		  HAL_GPIO_WritePin(IGNITE_GPIO_Port, IGNITE_Pin, GPIO_PIN_SET);
+	  uint32_t passed = HAL_GetTick() - state_tick;
+
+	  ignite = false;
+	  count = passed / 1000;
+
+	  switch (state) {
+
+	  case NoLaunch:
+		  if (launch_ready) ChangeState(StandBy);
+		  break;
+
+	  case StandBy:
+		  if (launch_ready && launch_condition) ChangeState(CountDown);
+		  break;
+
+	  case CountDown:
+		  if (!launch_condition) ChangeState(StandBy);
+		  else if (passed > LAUNCH_CONFIRM_KEEP_TICK)  ChangeState(Igniting);
+
+		  break;
+
+	  case Igniting:
+		  ignite = true;
+
+		  if (!launch_condition) ChangeState(Cancel);
+		  else if (passed > IGNITION_MAX_TICK) {
+			  ChangeState(Cancel);
+		  }
+		  else if (passed > IGNITION_MIN_TICK &&
+						  igniter_resistance > IGNITER_RESISTANCE_HIZ) {
+			  ChangeState(Complete);
+		  }
+
+		  break;
+
+	  case Cancel:
+		  if (launch_ready && launch_condition && passed > RETRY_TICK) {
+			  ChangeState(CountDown);
+		  }
+
+		  break;
+
+	  case Complete:
+
+		  break;
+	  }
+
+
+	  if (!launch_ready) {
+		  state = NoLaunch;
+	  }
+
+
+
+	  if (ignite) {
 		  __HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, 1);
+		  HAL_GPIO_WritePin(IGNITE_GPIO_Port, IGNITE_Pin, GPIO_PIN_SET);
 	  }
 	  else {
-		  HAL_GPIO_WritePin(IGNITE_GPIO_Port, IGNITE_Pin, GPIO_PIN_RESET);
 		  __HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, 0);
+		  HAL_GPIO_WritePin(IGNITE_GPIO_Port, IGNITE_Pin, GPIO_PIN_RESET);
+
+
+#ifdef TEST_ENABLE
+		  HAL_GPIO_WritePin(TEST_GPIO_Port, TEST_Pin, GPIO_PIN_SET);
+//		  ignite = true;
+#endif
+		  HAL_Delay(TEST_MS);
 	  }
 
 	  diag.setStatus(STATUS_0, battery_voltage < BATTERY_V_MIN);
-	  diag.setStatus(STATUS_2, launch_ok);
+	  diag.setStatus(STATUS_1, !igniter_connected);
+	  diag.setStatus(STATUS_2, !launch_ready);
+	  diag.setStatus(STATUS_3, !gps_alt.isValid() || !press_alt.isValid());
+
 
 
 	  Command tlm('I', 0, 0, 3);
 
 	  tlm.entries[0].set('V', (float)battery_voltage);
 	  tlm.entries[1].set('C', (float)igniter_current);
-	  tlm.entries[2].set('R', (float)0.0);
+	  tlm.entries[2].set('R', (float)igniter_resistance);
 
 	  can.tx.push(tlm);
 
 	  CAN_Send();
 
-	  Command mode('M', 0, 0, 2);
+	  Command mode('M', 0, 0, 3);
 
 	  mode.entries[0].set(launch_ok ? 'A' : 'N');
-	  mode.entries[1].set('0' + MODULE_IGNITER_N, (uint32_t)diag.encode());
+//	  mode.entries[1].set(launch_condition ? 'F' : 'S');
+	  mode.entries[1].set('C', press_condition, gps_condition, state, count);
+	  mode.entries[2].set('0' + MODULE_IGNITER_N, (uint32_t)diag.encode());
 
 	  can.tx.push(mode);
 
@@ -257,15 +475,31 @@ int main(void)
 #ifdef DEBUG
 
 		printf("Vb: %d.%03d V\n", (int)battery_voltage, abs((int)(battery_voltage * 1000) % 1000));
-		printf("CI: %d.%03d V\n", (int)igniter_current, abs((int)(igniter_current * 1000) % 1000));
-		printf("VI: %d.%03d V\n", (int)igniter_voltage, abs((int)(igniter_voltage * 1000) % 1000));
+		printf("CI: %c%d.%03d A\n", igniter_current > 0 ? ' ' : '-', (int)igniter_current, abs((int)(igniter_current * 1000) % 1000));
+		printf("VI: 0.%06d V\n",  abs((int)(igniter_voltage * 1000000) % 1000000));
+		printf("RI: %d.%03d Ohm\n", (int)igniter_resistance, abs((int)(igniter_resistance * 1000) % 1000));
+		printf("press: %d\n", press_condition);
+		printf("gps: %d\n", gps_condition);
+		printf("state: %d\n", state);
+		printf("count: %d\n", count);
 
-		diag.printSummary();
+//		diag.printSummary();
 #endif
+
+		HAL_GPIO_WritePin(TEST_GPIO_Port, TEST_Pin, GPIO_PIN_RESET);
+//		HAL_GPIO_WritePin(IGNITE_GPIO_Port, IGNITE_Pin, GPIO_PIN_RESET);
+//		ignite = false;
+
+
 
     	HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
-  	  HAL_Delay(250);
+      if (ignite) {
+      	  HAL_Delay(1000 / IGNITING_TLM_FREQ);
+      }
+      else {
+    	  HAL_Delay(1000 / TLM_FREQ - TEST_MS);
+      }
 
 
     /* USER CODE BEGIN 3 */

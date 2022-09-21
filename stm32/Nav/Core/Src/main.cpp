@@ -37,12 +37,15 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+#define TEST
+
 #define CAN_SEND_TIMEOUT_TICK 10
 
 #define SAMPLE_FREQ 100
 #define TLM_FREQ 10
 
-#define GPS_LOST_TICK 100000
+#define GPS_LOST_TICK 10000
 
 #define PRESSURE_FILTER_A 0.5
 #define ALTITUDE_FILTER_A 0.5
@@ -99,6 +102,9 @@ float p_v_speed;
 
 float qnh_pa = 101325;
 
+#ifdef TEST
+float gps_altitude;
+#endif
 
 /* USER CODE END PV */
 
@@ -131,9 +137,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
     	float p_altitude_raw_p = p_altitude_raw;
 
+#ifdef TEST
+    	pressure_raw    -= 10;
+    	p_altitude_raw  += 1;
+    	temperature_raw -= 0.001;
+    	gps_altitude    += 1;
+#else
     	pressure_raw    = bmp280.readPressure();
     	p_altitude_raw  = bmp280.readAltitude(qnh_pa / 100.0);
     	temperature_raw = bmp280.readTemperature();
+#endif
+
     	p_v_speed_raw   = (p_altitude_raw - p_altitude_raw_p) * SAMPLE_FREQ;
 
     	pressure    = pressure    * (1 - PRESSURE_FILTER_A) + pressure_raw    * PRESSURE_FILTER_A;
@@ -178,11 +192,19 @@ void Measure() {
 
 		pos.size += 2;
 	}
-	if (altitude_ok) {
-		pos.entries[pos.size].set('H', (float)gps.altitude.meters());
 
-		pos.size++;
-	}
+
+#ifdef TEST
+	pos.entries[pos.size].set('H', gps_altitude);
+
+	pos.size++;
+#else
+
+	pos.entries[pos.size].set('H', (float)gps.altitude.meters());
+
+	pos.size++;
+#endif
+
 
 	can.tx.push(pos);
 
@@ -287,6 +309,7 @@ int main(void)
   printf("Start\n");
 #endif
 
+
   HAL_Delay(100);
 
   bmp280_ok = bmp280.begin();
@@ -303,9 +326,18 @@ int main(void)
 					 BMP280::FILTER_X16,      /* Filtering. */
 					 BMP280::STANDBY_MS_500); /* Standby time. */
 
+#ifdef TEST
+  gps_altitude = 10000;
+  p_altitude_raw = 10000;
+  p_altitude = 10000;
+#else
+  pressure    = bmp280.readPressure();
+  p_altitude  = bmp280.readAltitude(qnh_pa / 100.0);
+  temperature = bmp280.readTemperature();
+#endif
 
-    HAL_TIM_Base_Start_IT(&htim3);
-    HAL_TIM_Base_Start_IT(&htim4);
+  HAL_TIM_Base_Start_IT(&htim3);
+  HAL_TIM_Base_Start_IT(&htim4);
 
   /* USER CODE END 2 */
 

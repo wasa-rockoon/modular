@@ -50,7 +50,7 @@
 #define GS
 #endif
 
-#define LORA_SETUP
+//#define LORA_SETUP
 
 #define SD_SYNC_TICK 100
 
@@ -62,8 +62,8 @@ const char DEST_ADDR[] = "FFFF";
 #define SEND_IFREQ 13
 #endif
 #ifdef GS
-const char OWN_ID[] = "0001";
-//const char OWN_ID[] = "0002";
+//const char OWN_ID[] = "0001";
+const char OWN_ID[] = "0002";
 const char DEST_ADDR[] = "0000";
 #define SEND_IFREQ 17
 #endif
@@ -192,6 +192,7 @@ Command command_mode('m', 'L', 0, 0);
 Command command_settings('s', 'L', 0, 0);
 
 bool send_settings = false;
+bool send_mode = false;
 
 #endif
 
@@ -342,6 +343,7 @@ void CAN_Received() {
 #ifdef GS
 	case 'm':
 		command_mode = can.rx;
+		send_mode = true;
 		break;
 	case 's':
 		command_settings = can.rx;
@@ -439,7 +441,7 @@ int main(void)
   if (file_opened) HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 
 #ifdef DEBUG
-//  printf("Init\n");
+  printf("Init\n");
 #endif
 
   /* USER CODE END 2 */
@@ -569,8 +571,9 @@ int main(void)
 					  lora.send(PANID, DEST_ADDR, command_settings);
 					  send_settings = false;
 				  }
-				  else {
+				  else if (send_mode) {
 					  lora.send(PANID, DEST_ADDR, command_mode);
+					  send_mode = false;
 				  }
 
 				  lora_last_send_tick = HAL_GetTick();

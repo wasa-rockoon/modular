@@ -9,6 +9,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+//template <>
+//inline uint32_t Payload::as<uint32_t>() { return uint; };
+//template <>
+//inline int32_t Payload::as<int32_t>() { return int_; };
+//template <>
+//inline float Payload::as<float>() { return float_; };
+
 
 void Entry::set(uint8_t type) {
 	this->type = type, payload.uint = 0;
@@ -17,6 +24,13 @@ void Entry::set(uint8_t type) {
 void Entry::set(uint8_t type, const uint8_t* bytes) {
 	this->type = type;
 	for (int i = 0; i < 4; i++) payload.bytes[i] = bytes[i];
+}
+void Entry::set(uint8_t type, uint8_t byte0, uint8_t byte1, uint8_t byte2, uint8_t byte3) {
+	this->type = type;
+	payload.bytes[0] = byte0;
+	payload.bytes[1] = byte1;
+	payload.bytes[2] = byte2;
+	payload.bytes[3] = byte3;
 }
 
 void Entry::set(uint8_t type, int32_t value) {

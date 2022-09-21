@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <cmath>
+//#include "shared.hpp"
 
 
 #ifndef MAX_ENTRIES
@@ -28,7 +29,21 @@ union Payload {
 	uint32_t uint;
 	int32_t int_;
 	float float_;
+
+
+//	template <>
+//	inline uint32_t as<uint32_t>() { return uint; };
+//	template <>
+//	inline int32_t Payload::as<int32_t>() { return int_; };
+
+
 };
+
+template <typename T>
+inline T payloadAs(Payload p);
+
+template <>
+inline float payloadAs<float>(Payload p) { return p.float_; };
 
 const union Payload default_payload = { .uint = 0 };
 
@@ -38,6 +53,7 @@ struct Entry {
 
     void set(uint8_t type);
     void set(uint8_t type, const uint8_t* bytes);
+    void set(uint8_t type, uint8_t byte0, uint8_t byte1, uint8_t byte2, uint8_t byte3);
     void set(uint8_t type, int32_t value);
     void set(uint8_t type, uint32_t value);
     void set(uint8_t type, float value);

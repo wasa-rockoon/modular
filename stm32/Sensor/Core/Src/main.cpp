@@ -40,7 +40,7 @@
 /* USER CODE BEGIN PD */
 
 #define SENSOR_FREQ 10
-#define MODE_FREQ 1
+#define MODE_FREQ 2
 
 #define ENV_TH_R0 10000
 #define IGN_TH_R0 10000
@@ -92,6 +92,18 @@ float env_temperature;
 float igniter_temperature;
 
 bool flight_mode = false;
+bool env_temp_ok = true;
+bool ign_temp_ok = true;
+bool charging = false;
+
+enum State {
+	NoLaunch = 0,
+	StandBy,
+	CountDown,
+	Igniting,
+	Cancel,
+	Complete,
+};
 
 /* USER CODE END PV */
 
@@ -148,12 +160,26 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		CAN_Send();
 
 		diag.update(HAL_GetTick());
+
+
+
+		HAL_GPIO_WritePin(CHARGE_GPIO_Port, CHARGE_Pin, GPIO_PIN_SET);
+
+
+
+#ifndef DEBUG
+	  HAL_IWDG_Refresh(&hiwdg);
+#endif
+
     }
     else if (htim == &htim14) { // Send mode
 
     	flight_mode = !HAL_GPIO_ReadPin(FLIGHT_PIN_GPIO_Port, FLIGHT_PIN_Pin);
 
     	diag.setStatus(STATUS_0, !flight_mode);
+    	diag.setStatus(STATUS_1, !env_temp_ok);
+    	diag.setStatus(STATUS_2, !ign_temp_ok);
+    	diag.setStatus(STATUS_3, charging);
 
 		Command flight('F', 0, 0, 2);
 
@@ -182,6 +208,26 @@ void CAN_Received() {
 	uint32_t raw;
 	int32_t mid = can.rx.getDiag(raw);
 	if (mid >= 0) diag.update(mid, raw, HAL_GetTick());
+
+	if (can.rx.id == 'M') {
+		Payload p;
+		if (can.rx.get('C', 0, p)) {
+			uint8_t state = p.bytes[2];
+			switch (state) {
+			case NoLaunch:
+			case StandBy:
+			case CountDown:
+			case Cancel:
+				charging = true;
+				break;
+			case Igniting:
+			case Complete:
+				charging = false;
+				break;
+			}
+		}
+	}
+
 }
 
 /* USER CODE END 0 */
@@ -234,10 +280,10 @@ int main(void)
   HAL_ADCEx_Calibration_Start(&hadc);
   HAL_ADC_Start_DMA(&hadc, (uint32_t*)adc_values, 10);
 
+  HAL_Delay(150);
+
   HAL_TIM_Base_Start_IT(&htim2);
   HAL_TIM_Base_Start_IT(&htim14);
-
-  HAL_Delay(1000);
 
 //  HAL_GPIO_WritePin(IGNITER_TEMP_EN_GPIO_Port, IGNITER_TEMP_EN_Pin, GPIO_PIN_SET);
 
@@ -253,13 +299,9 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-//	  HAL_Delay(100);
+	  HAL_Delay(100);
 
 //	  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-
-#ifndef DEBUG
-	  HAL_IWDG_Refresh(&hiwdg);
-#endif
   }
   /* USER CODE END 3 */
 }
@@ -584,27 +626,37 @@ static void MX_DMA_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-	/* GPIO Ports Clock Enable */
-	__HAL_RCC_GPIOA_CLK_ENABLE();
-	__HAL_RCC_GPIOB_CLK_ENABLE();
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
-	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
-	/*Configure GPIO pin : LED_Pin */
-	GPIO_InitStruct.Pin = LED_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(CHARGE_GPIO_Port, CHARGE_Pin, GPIO_PIN_RESET);
 
-	/*Configure GPIO pin : FLIGHT_PIN_Pin */
-	GPIO_InitStruct.Pin = FLIGHT_PIN_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	HAL_GPIO_Init(FLIGHT_PIN_GPIO_Port, &GPIO_InitStruct);
+  /*Configure GPIO pin : LED_Pin */
+  GPIO_InitStruct.Pin = LED_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : FLIGHT_PIN_Pin */
+  GPIO_InitStruct.Pin = FLIGHT_PIN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(FLIGHT_PIN_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : CHARGE_Pin */
+  GPIO_InitStruct.Pin = CHARGE_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(CHARGE_GPIO_Port, &GPIO_InitStruct);
 
 }
 
@@ -618,7 +670,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 	}
 
 	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
-		can.cancelSending();
+//		can.cancelSending();
 		CAN_Received();
 	}
 }
@@ -631,7 +683,7 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
 	}
 
 	if (can.receive(CanRxHeader.StdId, CanRxData, CanRxHeader.DLC)) {
-		can.cancelSending();
+//		can.cancelSending();
 		CAN_Received();
 	}
 }
