@@ -106,30 +106,36 @@ const command_format = {
     entries: {
       'N': { name: 'Launch', payload: 'No', warning: true },
       'A': { name: 'Launch', payload: 'Allow' },
-      'S': { name: 'Mode', payload: 'Standby', warning: true },
+      'S': { name: 'Mode', payload: 'Ground', warning: true },
       'F': { name: 'Mode', payload: 'Flight' },
-      'V': { name: 'Condition', datatype: 'bytes',
+      'C': { name: 'Condition', datatype: 'bytes',
              bytes: [
                {
                  name: 'Pressrue Alt',
                  enum: ['Unavailable', 'Under Min', 'Min - Std',
-                        'Std - Max', 'Over Max']
+                        'Std - Max', 'Over Max'],
+                 error: [true, false, false, false, false],
                },
                {
                  name: 'GPS Alt',
                  enum: ['Unavailable', 'Under Min', 'Min - Std',
-                        'Std - Max', 'Over Max']
+                        'Std - Max', 'Over Max'],
+                 error: [true, false, false, false, false],
                },
                {
-                 name: 'Condition',
-                 enum: ['No', 'OK'],
+                 name: 'State',
+                 enum: ['No Launch', 'Stand By', 'Count Down', 'Igniting',
+                        'Cancel', 'Complete'
+                       ],
+                 warning: [true, false, false, true, false],
                },
                {
-                 name: 'Ignition',
-                 enum: ['Not Yet', 'Igniting', 'Complete']
+                 name: 'count',
+                 datatype: 'uint'
                }
              ],
-           }
+           },
+    },
   },
   'T': {
     name: 'Temperature',
@@ -141,7 +147,7 @@ const command_format = {
   'F': {
     name: 'Flight Mode',
     entries: {
-      'S': { name: 'Mode', payload: 'Standby'  },
+      'S': { name: 'Mode', payload: 'Ground'  },
       'F': { name: 'Mode', payload: 'Flight' },
     }
   },
@@ -169,12 +175,39 @@ const command_format = {
     entries: {
       'N': { name: 'Launch', payload: 'No', warning: true },
       'A': { name: 'Launch', payload: 'Allow' },
-      'S': { name: 'Mode', payload: 'Standby', warning: true },
+      'S': { name: 'Mode', payload: 'Ground', warning: true },
       'F': { name: 'Mode', payload: 'Flight' },
       'i': { name: 'Min Launch Alt', unit: 'm', datatype: 'float' },
       's': { name: 'Std Launch Alt', unit: 'm', datatype: 'float' },
       'a': { name: 'Max Launch Alt', unit: 'm', datatype: 'float' },
       'q': { name: 'QNH', unit: 'Pa', datatype: 'float' },
+      'C': { name: 'Condition', datatype: 'bytes',
+             bytes: [
+               {
+                 name: 'Pressrue Alt',
+                 enum: ['Unavailable', 'Under Min', 'Min - Std',
+                        'Std - Max', 'Over Max'],
+                 error: [true, false, false, false, false],
+               },
+               {
+                 name: 'GPS Alt',
+                 enum: ['Unavailable', 'Under Min', 'Min - Std',
+                        'Std - Max', 'Over Max'],
+                 error: [true, false, false, false, false],
+               },
+               {
+                 name: 'State',
+                 enum: ['No Launch', 'Stand By', 'Count Down', 'Igniting',
+                        'Cancel', 'Complete'
+                       ],
+                 warning: [true, false, false, true, false],
+               },
+               {
+                 name: 'count',
+                 datatype: 'uint'
+               }
+             ],
+           },
     }
   },
   's': {
@@ -210,11 +243,11 @@ let diagnostics = [
   },
   {
     name: 'Sensor',
-    status: ['FP', null, null, null],
+    status: ['FP', 'Env', 'Ig', 'Charge'],
   },
   {
     name: 'Igniter',
-    status: ['Bat', 'Con', 'No', 'Alt'],
+    status: ['Bat', 'Con', 'Ready', 'Alt'],
   },
   {
     name: 'Nav',
@@ -615,7 +648,7 @@ function addHexCommands(str, local) {
   lines.forEach((line, _) => {
     let command = addHexCommand(line, local);
     if (lines.length < 50) {
-        console.log(command);
+        // console.log(command);
     }
   });
 }
@@ -694,11 +727,19 @@ function entryItem(entry) {
     let dom = '';
     entry.payload.forEach((payload, i) => {
       let format = entry.bytes[i];
+
+      let class_ = '';
+      if (format.error && format.error[payload])
+        class_ += 'error ';
+      if (format.warning && format.warning[payload])
+        class_ += 'warning ';
+
       if (format.enum) {
         payload = format.enum[payload];
       }
+
       dom +=
-        `<tr>
+        `<tr class="${class_}">
            <td colspan="2">${format.name}</td>
            <td>${format.unit ? '[' + format.unit + ']' : ''}</td>
            <td colspan="2">${payload == null ? '' : payload}</td>
@@ -718,7 +759,9 @@ function entryItem(entry) {
       break;
     }
 
-    let class_ = `${entry.error ? 'error' : ''}`
+    let class_  = '';
+    if (entry.error) class_ += 'error ';
+    if (entry.warning) class_ += 'warning';
 
     let index = '';
     if (Array.isArray(entry.indexLabel))
@@ -836,7 +879,7 @@ function parseCommandHex(line) {
         entry.payload = new Date(view.getUint32(0) * 1000);
         break;
       case 'bytes':
-        entry.payload = [0, 1, 2, 3].forEach(i => view.getUint8(3 - i));
+        entry.payload = [0, 1, 2, 3].map(i => view.getUint8(3 - i));
         break;
       case 'diag':
         entry.payload = view.getUint32(0);

@@ -30,8 +30,10 @@ static const uint32_t GPSBaud = 9600;
 
 #define GPS_SWITCH_FREQ 0.1
 
-const char ssid[] = "Rockoon-GS";
-const char pass[] = "rockoon-gs";
+/* const char ssid[] = "Rockoon-GS1"; */
+/* const char pass[] = "rockoon-gs1"; */
+const char ssid[] = "Rockoon-GS2";
+const char pass[] = "rockoon-gs2";
 const IPAddress ip(192,168,1,1);
 const IPAddress subnet(255,255,255,0);
 AsyncWebServer server(80);
@@ -124,21 +126,22 @@ void loop() {
 
   }
   else if (gps.location.isUpdated()) {
-    struct tm t;
-    t.tm_year  = gps.date.year() - 1900;
-    t.tm_mon   = gps.date.month() - 1;
-    t.tm_mday  = gps.date.day();
-    t.tm_hour  = gps.time.hour();
-    t.tm_min   = gps.time.minute();
-    t.tm_sec   = gps.time.second();
-    t.tm_isdst = -1;
-    time_t epoch = mktime(&t);
+    /* struct tm t; */
+    /* t.tm_year  = gps.date.year() - 1900; */
+    /* t.tm_mon   = gps.date.month() - 1; */
+    /* t.tm_mday  = gps.date.day(); */
+    /* t.tm_hour  = gps.time.hour(); */
+    /* t.tm_min   = gps.time.minute(); */
+    /* t.tm_sec   = gps.time.second(); */
+    /* t.tm_isdst = -1; */
+    /* time_t epoch = mktime(&t); */
 
     Command position('P', 0, 0, 4);
     position.entries[0].set('O', (float)gps.location.lng());
     position.entries[1].set('A', (float)gps.location.lat());
     position.entries[2].set('H', (float)gps.altitude.meters());
-    position.entries[3].set('U', (uint32_t)(epoch));
+    position.entries[3].set('D', (uint32_t)gps.date.value());
+    position.entries[3].set('T', (uint32_t)gps.time.value());
 
     can_channel.tx.push(position);
     sendCAN();
@@ -148,19 +151,32 @@ void loop() {
 
   int step = int(millis() * GPS_SWITCH_FREQ) % 1000;
   if (step < 500 && step % 10 == 0) {
-    strcpy(lcd.line1, "GS     ");
-    snprintf(lcd.line2, 7, "%3.1fs ",
-             min((gps.location.age() / 1000.0), 999.9));
-    snprintf(lcd.line1 + 6, 11, "%3.7f", gps.location.lng());
-    snprintf(lcd.line2 + 6, 10, "%3.7f", gps.location.lat());
+    strcpy(lcd.line1, "GS      ");
+    if (gps.location.age() >= 100000) {
+      snprintf(lcd.line2, 7, "N/A  ");
+    }
+    else {
+      snprintf(lcd.line2, 7, "%3.1fs ", (gps.location.age() / 1000.0));
+    }
+    printDegree(lcd.line1 + 7, gps.location.lng());
+    printDegree(lcd.line2 + 7, gps.location.lat());
+    /* snprintf(lcd.line1 + 6, 11, "%3.7f", gps.location.lng()); */
+    /* snprintf(lcd.line2 + 6, 11, "%3.7f", gps.location.lat()); */
     lcd.show();
   }
   else if (step >= 500 && step % 10 == 0) {
-    strcpy(lcd.line1, "L      ");
-    snprintf(lcd.line2, 7, "%3.1fs ",
-             min((millis() - launcher_gps_received) / 1000.0, 999.9));
-    snprintf(lcd.line1 + 6, 11, "%3.7f", launcher_lng);
-    snprintf(lcd.line2 + 6, 11, "%3.7f", launcher_lat);
+    strcpy(lcd.line1, "L       ");
+    if (millis() - launcher_gps_received >= 100000) {
+      snprintf(lcd.line2, 8, "N/A     ");
+    }
+    else {
+      snprintf(lcd.line2, 8, "%3.1fs   ",
+               (millis() - launcher_gps_received) / 1000.0);
+    }
+    printDegree(lcd.line1 + 7, launcher_lng);
+    printDegree(lcd.line2 + 7, launcher_lat);
+    /* snprintf(lcd.line1 + 6, 11, "%3.7f", launcher_lng); */
+    /* snprintf(lcd.line2 + 6, 11, "%3.7f", launcher_lat); */
     lcd.show();
   }
 
@@ -199,6 +215,13 @@ void loop() {
     }
     sent_command_ms = millis();
   }
+}
+
+void printDegree(char* buf, float deg) {
+  int d = (int)deg;
+  int m = (int)((deg - d) * 60);
+  int s = (int)(((deg - d) * 60 - m) * 60);
+  sprintf(buf, "%3d'%02d'%02d", (int)d, (int)m, (int)s);
 }
 
 
