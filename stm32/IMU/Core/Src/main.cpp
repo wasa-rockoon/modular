@@ -45,7 +45,7 @@
 
 #define CAN_SEND_TIMEOUT_TICK 10
 
-#define SAMPLE_FREQ 100
+#define SAMPLE_FREQ 50
 #define LOG_FREQ 10
 //#define LOG_FREQ 5
 

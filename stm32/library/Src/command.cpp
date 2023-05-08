@@ -116,7 +116,7 @@ uint8_t Entry::decodeHex(const uint8_t* buf) {
 
     type = data[0] & 0b01111111;
 
-    if (data[0] & 0b1000000) {
+    if (data[0] & 0b10000000) {
     	payload.uint = 0;
     	return 2;
     }
@@ -264,6 +264,10 @@ Queue<N>::Queue() {
 //	return true;
 //}
 
+
+
+
+
 template<uint8_t TXQ>
 Channel<TXQ>::Channel() {
 	receiving_ = -1;
@@ -271,8 +275,84 @@ Channel<TXQ>::Channel() {
 }
 
 
+
+BinaryChannel::BinaryChannel(): Channel() {}
+
+
+bool BinaryChannel::read(const uint8_t* data, uint8_t len) {
+  rx.id   = data[0];
+  rx.from = data[1];
+  rx.size = data[2];
+
+  unsigned i = 3;
+
+  for (uint8_t n = 0; n < rx.size; n++) {
+    if (i > len) {
+      error();
+      return false;
+    }
+    Entry entry;
+    i += entry.decode(data + i);
+    rx.entries[n] = entry;
+  }
+  return true;
+}
+
+
+unsigned BinaryChannel::write(uint8_t* data) {
+  if (tx.size() == 0) {
+		return 0;
+	}
+
+  data[0] = tx.first().id;
+  data[1] = tx.first().from;
+  data[2] = tx.first().size;
+
+  unsigned i = 3;
+  for (uint8_t n = 0; n < tx.first().size; n++) {
+    i += tx.first().entries[n].encode(data + i);
+  }
+
+	tx.pop();
+
+	return i;
+}
+
+unsigned BinaryChannel::nextWriteSize() const {
+  if (tx.size() == 0) {
+    return 0;
+  }
+  return 3 + tx.first().size * 5;
+}
+
+
+
 HexChannel::HexChannel(): Channel() {
 	rx_buf_count_ = 0;
+}
+
+bool HexChannel::receive(const uint8_t* data, uint8_t len) {
+    Entry entry;
+    uint8_t i = entry.decodeHex(data);
+
+    if (entry.type == 0) {
+        rx.setHeader(entry);
+
+        if (rx.id == 0) return false;
+
+        if (rx.size > MAX_ENTRIES) rx.size = MAX_ENTRIES;
+    }
+    else return false;
+
+    for (uint8_t n = 0; n < rx.size; n++) {
+        if (i >= len) return false;
+        int len = entry.decodeHex(data + i);
+        if (len == 0) return false;
+        i += len;
+        rx.entries[n] = entry;
+    }
+
+    return true;
 }
 
 uint8_t HexChannel::send(uint8_t* data, uint8_t& len) {

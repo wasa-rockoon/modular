@@ -18,7 +18,6 @@ public:
 	bool begin(bool reset = true);
 	bool config(uint8_t command, const char parameter[], uint8_t len);
 	bool startOperation();
-	void update();
 
 	bool send(const char panid[4], const char destid[4], const Command& command);
 	int8_t getResponse();

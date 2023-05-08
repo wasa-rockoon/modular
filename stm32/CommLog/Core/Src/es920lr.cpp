@@ -45,7 +45,10 @@ bool ES920LR::begin(bool reset) {
 
 		return waitConfigResponse();
 	}
-	else return false;
+	else {
+		clear();
+		return true;
+	}
 
 }
 
@@ -95,7 +98,7 @@ bool ES920LR::config(uint8_t command, const char parameter[], uint8_t len) {
 bool ES920LR::waitConfigResponse() {
 	uint8_t response[5];
 	for (int n = 0; n < 4; n++) {
-		while (rxIsEmpty());
+//		while (rxIsEmpty());
 		response[n] = read();
 	}
 	response[4] = '\0';
@@ -140,15 +143,20 @@ bool ES920LR::receive(Command& command) {
 	int8_t len = receive();
 	if (len < 2) return false;
 
-	command.id   = rx_buf_[0];
-	command.size = rx_buf_[1];
+	command.id   = read();
+	command.size = read();
 	command.to   = 0;
 	command.from = 0;
 
 	int i = 2;
 	for (int n = 0; n < command.size; n++) {
-		if (i >= len) return false;
-		i += command.entries[n].decode(rx_buf_ + i);
+		uint8_t data[5];
+		for (int i = 0; i < 5; i++) {
+			if (available() == 0) return false;
+			data[i] = read();
+		}
+
+		i += command.entries[n].decode(data);
 	}
 
 	return true;
@@ -235,7 +243,7 @@ int8_t ES920LR::receive(uint16_t& panid, uint16_t& addr) {
 	addr = read4Hex();
 	rx_count++;
 
-	for (int n = 0; n < len; n++) rx_buf_[n] = read();
+//	for (int n = 0; n < len; n++) rx_buf_[n] = read();
 
 	return len;
 }

@@ -4,7 +4,7 @@ let host = ''
 host = 'http://gs.local'
 
 let LAUNCHER_MODE = false
-// LAUNCHER_MODE = true
+LAUNCHER_MODE = true
 
 const POLLING_FREQ = 1
 const MAX_PLOT_ELEMENTS = 1000
@@ -24,6 +24,9 @@ let serevr_error_count = 0;
 Chart.defaults.global.defaultFontColor = "#fff";
 
 let charts = null;
+
+let mapImage = new Image();
+mapImage.src = 'map.png';
 
 const command_format = {
   'B': {
@@ -90,8 +93,23 @@ const command_format = {
              datatype: 'float',
              indexLabel: ['x', 'y', 'z']
            },
+      'G': { name: 'Gyro',
+             unit: 'deg/s',
+             datatype: 'float',
+             indexLabel: ['x', 'y', 'z']
+           },
       'P': { name: 'Presssure Alt', unit: 'm', datatype: 'float' },
     }
+  },
+  'a': {
+    name: 'Attitude',
+    entries: {
+      'M': { name: 'Mag',
+             unit: 'mT',
+             datatype: 'float',
+             indexLabel: ['x', 'y', 'z']
+           },
+    },
   },
   'I': {
     name: 'Igniter',
@@ -264,18 +282,22 @@ function chartConfig() {
   let c = [
     {
       name: 'Launcher Location',
-      local: false,
+      local: LAUNCHER_MODE,
       id: LAUNCHER_MODE ? 'P' : 'n',
       x: 'O',
       y: ['A'],
       xLabel: 'Longitude [deg]',
       yLabel: 'Latitude [deg]',
-      xDataMin: 100,
-      yDataMin: 25,
+      xMin: 132,
+      xMax: 134,
+      yMin: 32,
+      yMax: 34,
+      aspect: 1,
+      // background: mapImage,
     },
     {
       name: 'Launcher Altitude',
-      local: false,
+      local: LAUNCHER_MODE,
       id: LAUNCHER_MODE ? 'P' : 'n',
       x: 't',
       y: ['H', 'P'],
@@ -283,20 +305,30 @@ function chartConfig() {
       yLabel: 'Altitude [m]'
     },
     {
+      name: 'Launcher Ascent Rate',
+      local: LAUNCHER_MODE,
+      id: LAUNCHER_MODE ? 'P' : 'n',
+      x: 't',
+      y: ['V'],
+      xLabel: 't [s]',
+      yLabel: 'Ascent Rate [m/s]'
+    },
+    {
       name: 'Launcher Battery',
-      local: false,
+      local: LAUNCHER_MODE,
       id: LAUNCHER_MODE ? 'B' : 'l',
       x: 't',
       y: LAUNCHER_MODE ? ['P', 'C', 'D'] : ['V'],
       xLabel: 't [s]',
       yLabel: 'Voltage [V]',
       yDataMax: 100,
+      yDataMin: -100,
       // yMin: 6,
       // yMax: 15
     },
     {
       name: 'LoRa RX',
-      local: !LAUNCHER_MODE,
+      local: true,
       id: 'R',
       x: 't',
       y: ['R'],
@@ -309,7 +341,7 @@ function chartConfig() {
     c = c.concat([
       {
         name: 'Pressure',
-        local: false,
+        local: true,
         id: 'E',
         x: 't',
         y: ['P'],
@@ -318,7 +350,7 @@ function chartConfig() {
       },
       {
         name: 'Interiour Temperature',
-        local: false,
+        local: true,
         id: 'E',
         x: 't',
         y: ['I'],
@@ -327,37 +359,73 @@ function chartConfig() {
       },
       {
         name: 'Temperature',
-        local: false,
+        local: true,
         id: 'T',
         x: 't',
         y: ['I', 'A'],
         xLabel: 't [s]',
         yLabel: 'Temperature [℃]'
       },
+      {
+        name: 'Satelites',
+        local: true,
+        id: 'E',
+        x: 't',
+        y: ['S'],
+        xLabel: 't [s]',
+        yLabel: 'Satelites'
+      },
+      {
+        name: 'Igniter',
+        local: true,
+        id: 'I',
+        x: 't',
+        y: ['V'],
+        xLabel: 't [s]',
+        yLabel: 'Battery Voltage [V]'
+      },
+      {
+        name: 'Igniter',
+        local: true,
+        id: 'I',
+        x: 't',
+        y: ['C'],
+        xLabel: 't [s]',
+        yLabel: 'Current [A]'
+      },
+      {
+        name: 'Igniter',
+        local: true,
+        id: 'I',
+        x: 't',
+        y: ['R'],
+        xLabel: 't [s]',
+        yLabel: 'Resistance [Ω]'
+      },
     ])
   }
   else  {
     c = c.concat([
-      {
-        name: 'GS Location',
-        local: true,
-        id: 'P',
-        x: 'O',
-        y: ['A'],
-        xLabel: 'Longitude [deg]',
-        yLabel: 'Latitude [deg]'
-      },
-      {
-        name: 'GS Battery',
-        local: true,
-        id: 'B',
-        x: 't',
-        y: ['P', 'C', 'D'],
-        xLabel: 't [s]',
-        yLabel: 'Voltage [V]',
-        // yMin: 0,
-        // yMax: 10,
-      },
+      // {
+      //   name: 'GS Location',
+      //   local: true,
+      //   id: 'P',
+      //   x: 'O',
+      //   y: ['A'],
+      //   xLabel: 'Longitude [deg]',
+      //   yLabel: 'Latitude [deg]'
+      // },
+      // {
+      //   name: 'GS Battery',
+      //   local: true,
+      //   id: 'B'
+      //   x: 't',
+      //   y: ['P', 'C', 'D'],
+      //   xLabel: 't [s]',
+      //   yLabel: 'Voltage [V]',
+      //   // yMin: 0,
+      //   // yMax: 10,
+      // },
     ]);
   }
   return c;
@@ -371,6 +439,19 @@ function createCharts() {
   for (const chart of charts) {
     const canvas = $('<canvas></canvas>');
     $('#charts').append(canvas);
+
+    function drawBackground(target) {
+      if (chart.background) {
+        // console.log(target)
+        target.ctx.drawImage(
+          chart.background,
+          target.chartArea.left,
+          target.chartArea.top,
+          target.chartArea.right - target.chartArea.left,
+          target.chartArea.bottom - target.chartArea.top,
+        );
+      }
+    }
 
     const data = {
       lebals: [],
@@ -436,7 +517,10 @@ function createCharts() {
           ]
         },
         animation: false,
-      }
+      },
+      plugins: [{
+        beforeDraw: drawBackground
+      }],
     }
 
     chart.chart = new Chart(canvas, config);
@@ -447,6 +531,7 @@ function addHistory(command) {
 
   for (chart of charts) {
     if (chart.id == command.id && chart.local == command.local) {
+      // console.log(command)
       const x_entry = command.entries.find(entry => entry.type == chart.x)
       if (!x_entry) {
         // console.error('Can\'t find x', chart.id, chart.x);
@@ -530,6 +615,7 @@ function main() {
 
   createCharts();
   render();
+  updateCharts();
 }
 
 function readFile() {
@@ -543,28 +629,40 @@ function readFile() {
   var reader = new FileReader();
   reader.readAsText(file);
   reader.onload = () => {
-    const lines = reader.result.split('\n').filter(line => line != "");
+    let lines = reader.result.split('\n').filter(line => line != "");
     console.log('File read', lines.length);
-    LAUNCHER_MODE = true;
     createCharts();
 
-    const local = false;
+    const size = lines.length;
 
-    lines.forEach((line, i) => {
-      addHexCommand(line, local);
-      if (i % READ_FILE_BREAK == 0) {
-        console.log(`${i} / ${lines.length}`);
-        render(local);
-        updateChart();
+    function add() {
+      console.log(`${size - lines.length} / ${size}`);
+      for (let n = 0; n < READ_FILE_BREAK; n++) {
+        if (lines.length == 0) {
+          console.log("complete");
+          return;
+        }
+        let line = lines.shift();
+        let command = addHexCommand(line);
       }
-    });
+      render(true);
+      render(false);
+      updateCharts();
+      setTimeout(add, 1);
+      // if (command.id == 'n') console.log(command);
+    }
 
+    add();
 
-    addHexCommands('0\n' + reader.result, false);
+    // addHexCommands('0\n' + reader.result, false);
 
     setTimeout(() => {
       fetchCancel();
       $('#connection-error').hide();
+
+      render(true);
+      render(false);
+      updateCharts();
     }, 1000)
 
   }
@@ -617,7 +715,7 @@ function fetch(local) {
     .then(str => {
       addHexCommands(str, local);
       render(LAUNCHER_MODE ? !local : local);
-      updateChart();
+      updateCharts();
     })
     .catch(e => {
       $('#connection-error').show();
@@ -632,7 +730,7 @@ function fetch(local) {
     });
 }
 
-function addHexCommands(str, local) {
+function addHexCommands(str) {
   $('#connection-error').hide();
   serevr_error_count = 0;
 
@@ -646,34 +744,36 @@ function addHexCommands(str, local) {
   lines.shift();
 
   lines.forEach((line, _) => {
-    let command = addHexCommand(line, local);
+    let command = addHexCommand(line);
     if (lines.length < 50) {
         // console.log(command);
     }
   });
 }
 
-function addHexCommand(line, local) {
+function addHexCommand(line) {
   let command = parseCommandHex(line);
 
   if (!command) return null;
 
-  if (LAUNCHER_MODE) local = !local;
-
   command.updated = true;
-  command.local = local;
+  command.local = command.from == '\0';
 
   addHistory(command);
 
-  if (local) local_packets[command.id] = command;
+  if (command.local) local_packets[command.id] = command;
   else remote_packets[command.id] = command;
 
   return command;
 }
 
-function updateChart() {
+function updateCharts() {
   for (chart of charts) {
     chart.chart.update();
+    if (chart.aspect) {
+      chart.chart.aspectRatio = chart.aspect;
+      chart.chart.resize();
+    }
   }
 }
 

@@ -32,6 +32,7 @@
 #include "diagnostics.hpp"
 #include "uart.hpp"
 #include "es920lr.hpp"
+#include "twelite.hpp"
 
 /* USER CODE END Includes */
 
@@ -52,6 +53,8 @@
 
 //#define LORA_SETUP
 
+//#define TWE_SETUP
+
 #define SD_SYNC_TICK 100
 
 const char PANID[] = "0110";
@@ -68,7 +71,13 @@ const char DEST_ADDR[] = "0000";
 #define SEND_IFREQ 17
 #endif
 
-//#define LORA_BAUD 115200
+#define TWE_APP_ID "57415341"
+#define TWE_DEV_ID "120"
+#define TWE_CHANNEL "12,18,25"
+#define TWE_DEST_ID 0
+
+
+#define TWE_BAUD 115200
 #define LORA_BAUD 38400
 
 #define COMMAND_REPEAT_FREQ 1
@@ -79,6 +88,8 @@ const char DEST_ADDR[] = "0000";
 
 #define UPLINK_WAIT_TICK 5000
 #define SETTING_CONFIRM_TICK 1000
+
+#define TWE_SEND_TICK 1000
 
 #define BLINK_TICK 200
 
@@ -135,7 +146,7 @@ Diagnostics diag(MODULE_COMMLOG);
 CANChannel can;
 HexChannel sd;
 
-UART twelite(huart1);
+TWELITE twelite(huart1);
 ES920LR lora(huart2);
 
 CAN_TxHeaderTypeDef   CanTxHeader;
@@ -147,6 +158,7 @@ uint32_t              CanTxMailbox;
 uint32_t can_last_send_tick = 0;
 uint32_t sd_last_sync_tick = 0;
 uint32_t lora_last_send_tick = 0;
+uint32_t twe_last_send_tick = 0;
 
 FATFS fs;  // file system
 FIL fil; // File
@@ -250,6 +262,30 @@ void LoRa_Setup() {
 	lora.config('w', "", 0); // save
 }
 
+void throgh() {
+  while (twelite.available() > 0) {
+    printf("%c", twelite.read());
+  }
+}
+
+void TWE_Setup() {
+	HAL_Delay(100);
+	twelite.interactiveMode();
+	throgh(); HAL_Delay(1); throgh();
+	twelite.config('a', TWE_APP_ID);
+	throgh(); HAL_Delay(1); throgh();
+	twelite.config('i', TWE_DEV_ID);
+	throgh(); HAL_Delay(1); throgh();
+	twelite.config('c', TWE_CHANNEL);
+	throgh(); HAL_Delay(1); throgh();
+//	twelite.config('m', "B");
+//	throgh(); HAL_Delay(1); throgh();
+	twelite.saveConfig();
+}
+
+
+
+
 bool SD_Init() {
 	fresult = f_mount(&fs, "/", 1);
 
@@ -302,11 +338,11 @@ void CAN_Received() {
 
 //	count++;
 
-	uint32_t raw;
-	int32_t mid = can.rx.getDiag(raw);
-	if (mid >= 0) {
-		diag.update(mid, raw, HAL_GetTick());
-	}
+//	uint32_t raw;
+//	int32_t mid = can.rx.getDiag(raw);
+//	if (mid >= 0) {
+//		diag.update(mid, raw, HAL_GetTick());
+//	}
 
 	switch (can.rx.id) {
 #ifdef LAUNCHER
@@ -437,6 +473,16 @@ int main(void)
   lora.begin();
 #endif
   lora.startOperation();
+
+
+  twelite.setDestination(TWE_DEST_ID);
+  twelite.begin();
+
+#ifdef TWE_SETUP
+  TWE_Setup();
+#endif
+
+
 
   if (file_opened) HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 
@@ -607,6 +653,21 @@ int main(void)
 		  }
 	  }
 
+	  Command twe_tlm;
+	  if (twelite.update(twe_tlm)) {
+		  Blink();
+		  twe_tlm.from = 'R';
+		  can.tx.push(twe_tlm);
+		  CAN_Send();
+
+//		  printf("RX %c (%c) [%d]\n", twe_tlm.id, twe_tlm.from, twe_tlm.size);
+
+		  if (file_opened) {
+			  twe_tlm.addTimestamp(HAL_GetTick());
+			  sd.tx.push(twe_tlm);
+		  }
+	  }
+
 	  if (sd.isSending()) {
 		  uint8_t buf[14];
 		  uint8_t len;
@@ -625,6 +686,17 @@ int main(void)
 	  if (file_opened && HAL_GetTick() - sd_last_sync_tick >= SD_SYNC_TICK){
 		  f_sync(&fil);
 		  sd_last_sync_tick = HAL_GetTick();
+	  }
+
+
+	  if (HAL_GetTick() - twe_last_send_tick > TWE_SEND_TICK) {
+		  twelite.send(command_mode);
+		  Blink();
+		  twe_last_send_tick = HAL_GetTick();
+
+#ifdef DEBUG
+			  printf("TWE Sent\n");
+#endif
 	  }
 
 
@@ -895,7 +967,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
 	huart1.Instance = USART1;
-	huart1.Init.BaudRate = 38400;
+	huart1.Init.BaudRate = TWE_BAUD;
 	huart1.Init.WordLength = UART_WORDLENGTH_8B;
 	huart1.Init.StopBits = UART_STOPBITS_1;
 	huart1.Init.Parity = UART_PARITY_NONE;

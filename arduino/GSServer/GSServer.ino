@@ -30,10 +30,10 @@ static const uint32_t GPSBaud = 9600;
 
 #define GPS_SWITCH_FREQ 0.1
 
-/* const char ssid[] = "Rockoon-GS1"; */
-/* const char pass[] = "rockoon-gs1"; */
-const char ssid[] = "Rockoon-GS2";
-const char pass[] = "rockoon-gs2";
+const char ssid[] = "Rockoon-GS1";
+const char pass[] = "rockoon-gs1";
+/* const char ssid[] = "Rockoon-GS2"; */
+/* const char pass[] = "rockoon-gs2"; */
 const IPAddress ip(192,168,1,1);
 const IPAddress subnet(255,255,255,0);
 AsyncWebServer server(80);
