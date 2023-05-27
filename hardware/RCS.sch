@@ -18023,7 +18023,7 @@ http://www.suntsuinc.com</description>
 <part name="CD" library="jst-ph" deviceset="S4B-PH-*" device="K-S"/>
 <part name="AB" library="jst-ph" deviceset="S4B-PH-*" device="K-S"/>
 <part name="U1" library="dcdc" deviceset="LT1930" device="" package3d_urn="urn:adsk.eagle:package:40217418/1"/>
-<part name="U$4" library="inductors" deviceset="NR10050" device="" value="10µH"/>
+<part name="L1" library="inductors" deviceset="NR10050" device="" value="10µH"/>
 <part name="GND1" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 <part name="U3" library="HX711" deviceset="HX711" device=""/>
 <part name="LOAD_X" library="con-jst" library_urn="urn:adsk.eagle:library:156" deviceset="?4B-ZR" device="S" package3d_urn="urn:adsk.eagle:package:7641/1"/>
@@ -18091,9 +18091,8 @@ http://www.suntsuinc.com</description>
 <part name="R13" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="1k"/>
 <part name="LED5" library="led" library_urn="urn:adsk.eagle:library:259" deviceset="LED" device="CHIP-LED0603" package3d_urn="urn:adsk.eagle:package:15819/3"/>
 <part name="R14" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="1k"/>
-<part name="STM32F001" library="stm32f0" deviceset="STM32F072" device="-LQFP48"/>
+<part name="STM32" library="stm32f0" deviceset="STM32F072" device="-LQFP48"/>
 <part name="VDD9" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="VDD" device=""/>
-<part name="SUPPLY2" library="supply2" library_urn="urn:adsk.eagle:library:372" deviceset="V+" device=""/>
 <part name="GND7" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 <part name="C7" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603K" package3d_urn="urn:adsk.eagle:package:23680/2"/>
 <part name="C10" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603K" package3d_urn="urn:adsk.eagle:package:23680/2"/>
@@ -18102,10 +18101,9 @@ http://www.suntsuinc.com</description>
 <part name="VDD12" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="VDD" device=""/>
 <part name="C12" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603K" package3d_urn="urn:adsk.eagle:package:23680/2"/>
 <part name="VDD13" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="VDD" device=""/>
-<part name="CRYSTAL" library="crystal'" deviceset="CRYTAL" device="FC-255" value="32.768kHz"/>
+<part name="XTAL" library="crystal'" deviceset="CRYTAL" device="FC-255" value="32.768kHz"/>
 <part name="CL3" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603K" package3d_urn="urn:adsk.eagle:package:23680/2" value="15pF"/>
 <part name="CL4" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603K" package3d_urn="urn:adsk.eagle:package:23680/2" value="15pF"/>
-<part name="VDD3" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="VDD" device=""/>
 <part name="LED2" library="led" library_urn="urn:adsk.eagle:library:259" deviceset="LED" device="CHIP-LED0603" package3d_urn="urn:adsk.eagle:package:15819/3"/>
 <part name="R11" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="1k"/>
 </parts>
@@ -18186,7 +18184,7 @@ http://www.suntsuinc.com</description>
 <attribute name="NAME" x="241.3" y="142.24" size="1.778" layer="95" align="center"/>
 <attribute name="VALUE" x="241.3" y="139.7" size="1.778" layer="96" align="center"/>
 </instance>
-<instance part="U$4" gate="G$1" x="241.3" y="149.86" smashed="yes">
+<instance part="L1" gate="G$1" x="241.3" y="149.86" smashed="yes">
 <attribute name="NAME" x="236.22" y="152.4" size="1.778" layer="95"/>
 <attribute name="VALUE" x="236.22" y="147.32" size="1.778" layer="96"/>
 </instance>
@@ -18448,15 +18446,12 @@ http://www.suntsuinc.com</description>
 <attribute name="NAME" x="100.33" y="-36.6014" size="1.778" layer="95"/>
 <attribute name="VALUE" x="100.33" y="-41.402" size="1.778" layer="96"/>
 </instance>
-<instance part="STM32F001" gate="G$1" x="33.02" y="12.7" smashed="yes">
+<instance part="STM32" gate="G$1" x="33.02" y="12.7" smashed="yes">
 <attribute name="NAME" x="33.02" y="104.14" size="1.778" layer="95"/>
 <attribute name="VALUE" x="33.02" y="10.16" size="1.778" layer="96"/>
 </instance>
 <instance part="VDD9" gate="G$1" x="15.24" y="96.52" smashed="yes">
 <attribute name="VALUE" x="12.7" y="93.98" size="1.778" layer="96" rot="R90"/>
-</instance>
-<instance part="SUPPLY2" gate="1" x="25.4" y="104.14" smashed="yes">
-<attribute name="VALUE" x="24.13" y="105.41" size="1.778" layer="96"/>
 </instance>
 <instance part="GND7" gate="1" x="25.4" y="58.42" smashed="yes">
 <attribute name="VALUE" x="22.86" y="55.88" size="1.778" layer="96"/>
@@ -18486,7 +18481,7 @@ http://www.suntsuinc.com</description>
 <instance part="VDD13" gate="G$1" x="10.16" y="96.52" smashed="yes">
 <attribute name="VALUE" x="7.62" y="93.98" size="1.778" layer="96" rot="R90"/>
 </instance>
-<instance part="CRYSTAL" gate="G$1" x="20.32" y="17.78" smashed="yes" rot="R90">
+<instance part="XTAL" gate="G$1" x="20.32" y="17.78" smashed="yes" rot="R90">
 <attribute name="NAME" x="19.304" y="15.24" size="1.778" layer="95" rot="R90"/>
 <attribute name="VALUE" x="25.4" y="15.24" size="1.778" layer="96" rot="R90"/>
 </instance>
@@ -18497,9 +18492,6 @@ http://www.suntsuinc.com</description>
 <instance part="CL4" gate="G$1" x="15.24" y="15.24" smashed="yes" rot="R90">
 <attribute name="NAME" x="12.319" y="11.684" size="1.778" layer="95"/>
 <attribute name="VALUE" x="17.399" y="11.684" size="1.778" layer="96"/>
-</instance>
-<instance part="VDD3" gate="G$1" x="96.52" y="7.62" smashed="yes">
-<attribute name="VALUE" x="93.98" y="5.08" size="1.778" layer="96" rot="R90"/>
 </instance>
 <instance part="LED2" gate="G$1" x="111.76" y="-7.62" smashed="yes" rot="R90">
 <attribute name="NAME" x="116.332" y="-4.064" size="1.778" layer="95" rot="R180"/>
@@ -18676,19 +18668,19 @@ http://www.suntsuinc.com</description>
 <pinref part="GND27" gate="1" pin="GND"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="VSSA(P8)"/>
+<pinref part="STM32" gate="G$1" pin="VSSA(P8)"/>
 <wire x1="27.94" y1="63.5" x2="25.4" y2="63.5" width="0.1524" layer="91"/>
 <wire x1="25.4" y1="63.5" x2="25.4" y2="60.96" width="0.1524" layer="91"/>
-<pinref part="STM32F001" gate="G$1" pin="VSS_1(P23)"/>
+<pinref part="STM32" gate="G$1" pin="VSS_1(P23)"/>
 <wire x1="27.94" y1="71.12" x2="25.4" y2="71.12" width="0.1524" layer="91"/>
 <wire x1="25.4" y1="71.12" x2="25.4" y2="68.58" width="0.1524" layer="91"/>
 <junction x="25.4" y="63.5"/>
-<pinref part="STM32F001" gate="G$1" pin="VSS_3(P47)"/>
+<pinref part="STM32" gate="G$1" pin="VSS_3(P47)"/>
 <wire x1="25.4" y1="68.58" x2="25.4" y2="66.04" width="0.1524" layer="91"/>
 <wire x1="25.4" y1="66.04" x2="25.4" y2="63.5" width="0.1524" layer="91"/>
 <wire x1="27.94" y1="66.04" x2="25.4" y2="66.04" width="0.1524" layer="91"/>
 <junction x="25.4" y="66.04"/>
-<pinref part="STM32F001" gate="G$1" pin="VSS_2(P35)"/>
+<pinref part="STM32" gate="G$1" pin="VSS_2(P35)"/>
 <wire x1="27.94" y1="68.58" x2="25.4" y2="68.58" width="0.1524" layer="91"/>
 <junction x="25.4" y="68.58"/>
 <pinref part="GND7" gate="1" pin="GND"/>
@@ -18794,7 +18786,6 @@ http://www.suntsuinc.com</description>
 <wire x1="96.52" y1="-38.1" x2="99.06" y2="-38.1" width="0.1524" layer="91"/>
 <wire x1="96.52" y1="-27.94" x2="96.52" y2="-38.1" width="0.1524" layer="91"/>
 <junction x="96.52" y="-27.94"/>
-<pinref part="VDD3" gate="G$1" pin="VDD"/>
 <wire x1="96.52" y1="5.08" x2="96.52" y2="2.54" width="0.1524" layer="91"/>
 <wire x1="96.52" y1="2.54" x2="99.06" y2="2.54" width="0.1524" layer="91"/>
 <pinref part="R11" gate="G$1" pin="1"/>
@@ -18830,7 +18821,7 @@ http://www.suntsuinc.com</description>
 </segment>
 <segment>
 <pinref part="VDD9" gate="G$1" pin="VDD"/>
-<pinref part="STM32F001" gate="G$1" pin="VDD_2(P48)"/>
+<pinref part="STM32" gate="G$1" pin="VDD_2(P48)"/>
 <wire x1="27.94" y1="88.9" x2="15.24" y2="88.9" width="0.1524" layer="91"/>
 <wire x1="15.24" y1="88.9" x2="15.24" y2="93.98" width="0.1524" layer="91"/>
 <pinref part="C11" gate="G$1" pin="1"/>
@@ -18838,7 +18829,7 @@ http://www.suntsuinc.com</description>
 <junction x="15.24" y="88.9"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="VDDIO2(P36)"/>
+<pinref part="STM32" gate="G$1" pin="VDDIO2(P36)"/>
 <wire x1="27.94" y1="86.36" x2="20.32" y2="86.36" width="0.1524" layer="91"/>
 <pinref part="C10" gate="G$1" pin="1"/>
 <wire x1="20.32" y1="86.36" x2="20.32" y2="81.28" width="0.1524" layer="91"/>
@@ -18847,7 +18838,7 @@ http://www.suntsuinc.com</description>
 <pinref part="VDD11" gate="G$1" pin="VDD"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="VDDA(P9)"/>
+<pinref part="STM32" gate="G$1" pin="VDDA(P9)"/>
 <wire x1="27.94" y1="83.82" x2="25.4" y2="83.82" width="0.1524" layer="91"/>
 <pinref part="C7" gate="G$1" pin="1"/>
 <wire x1="25.4" y1="83.82" x2="25.4" y2="81.28" width="0.1524" layer="91"/>
@@ -18856,7 +18847,7 @@ http://www.suntsuinc.com</description>
 <pinref part="VDD12" gate="G$1" pin="VDD"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="VDD_1(P24)"/>
+<pinref part="STM32" gate="G$1" pin="VDD_1(P24)"/>
 <wire x1="27.94" y1="91.44" x2="10.16" y2="91.44" width="0.1524" layer="91"/>
 <wire x1="10.16" y1="91.44" x2="10.16" y2="81.28" width="0.1524" layer="91"/>
 <pinref part="C12" gate="G$1" pin="1"/>
@@ -18871,7 +18862,7 @@ http://www.suntsuinc.com</description>
 <pinref part="SUPPLY3" gate="G$1" pin="VPP"/>
 </segment>
 <segment>
-<pinref part="U$4" gate="G$1" pin="1"/>
+<pinref part="L1" gate="G$1" pin="1"/>
 <wire x1="236.22" y1="149.86" x2="233.68" y2="149.86" width="0.1524" layer="91"/>
 <pinref part="U1" gate="G$1" pin="VIN"/>
 <wire x1="233.68" y1="149.86" x2="233.68" y2="147.32" width="0.1524" layer="91"/>
@@ -18904,9 +18895,7 @@ http://www.suntsuinc.com</description>
 <wire x1="88.9" y1="127" x2="91.44" y2="127" width="0.1524" layer="91"/>
 <wire x1="88.9" y1="114.3" x2="88.9" y2="127" width="0.1524" layer="91"/>
 <wire x1="129.54" y1="114.3" x2="88.9" y2="114.3" width="0.1524" layer="91"/>
-</segment>
-<segment>
-<pinref part="STM32F001" gate="G$1" pin="PB8/I2C1_SCL/TIM16_CH1/CAN_RX"/>
+<pinref part="STM32" gate="G$1" pin="PB8/I2C1_SCL/TIM16_CH1/CAN_RX"/>
 <wire x1="121.92" y1="33.02" x2="129.54" y2="33.02" width="0.1524" layer="91"/>
 <label x="121.92" y="33.02" size="1.778" layer="95"/>
 <wire x1="129.54" y1="33.02" x2="129.54" y2="114.3" width="0.1524" layer="91"/>
@@ -18916,9 +18905,7 @@ http://www.suntsuinc.com</description>
 <segment>
 <pinref part="MCP1" gate="G$1" pin="TXD"/>
 <wire x1="114.3" y1="129.54" x2="132.08" y2="129.54" width="0.1524" layer="91"/>
-</segment>
-<segment>
-<pinref part="STM32F001" gate="G$1" pin="PB9/I2C1_SDA/TIM17_CH1/CAN_TX"/>
+<pinref part="STM32" gate="G$1" pin="PB9/I2C1_SDA/TIM17_CH1/CAN_TX"/>
 <wire x1="121.92" y1="30.48" x2="132.08" y2="30.48" width="0.1524" layer="91"/>
 <wire x1="132.08" y1="30.48" x2="132.08" y2="129.54" width="0.1524" layer="91"/>
 <label x="121.92" y="30.48" size="1.778" layer="95"/>
@@ -18929,100 +18916,19 @@ http://www.suntsuinc.com</description>
 <pinref part="U$2" gate="G$1" pin="!RESET!"/>
 <wire x1="0" y1="109.22" x2="139.7" y2="109.22" width="0.1524" layer="91"/>
 <wire x1="139.7" y1="109.22" x2="139.7" y2="154.94" width="0.1524" layer="91"/>
-<pinref part="STM32F001" gate="G$1" pin="NRST(P7)"/>
+<pinref part="STM32" gate="G$1" pin="NRST(P7)"/>
 <wire x1="27.94" y1="45.72" x2="0" y2="45.72" width="0.1524" layer="91"/>
 <wire x1="0" y1="45.72" x2="0" y2="109.22" width="0.1524" layer="91"/>
 <label x="7.62" y="45.72" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$24" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P14"/>
-<wire x1="177.8" y1="154.94" x2="177.8" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$33" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P13"/>
-<wire x1="175.26" y1="154.94" x2="175.26" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$34" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P12"/>
-<wire x1="172.72" y1="154.94" x2="172.72" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$35" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P11"/>
-<wire x1="170.18" y1="154.94" x2="170.18" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$36" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P10"/>
-<wire x1="167.64" y1="154.94" x2="167.64" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$43" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P9"/>
-<wire x1="165.1" y1="154.94" x2="165.1" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$44" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P8"/>
-<wire x1="162.56" y1="154.94" x2="162.56" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$45" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P7"/>
-<wire x1="160.02" y1="154.94" x2="160.02" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$46" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P6"/>
-<wire x1="157.48" y1="154.94" x2="157.48" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$47" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P5"/>
-<wire x1="154.94" y1="154.94" x2="154.94" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$48" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P4"/>
-<wire x1="152.4" y1="154.94" x2="152.4" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$49" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P3"/>
-<wire x1="149.86" y1="154.94" x2="149.86" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
 <net name="N$51" class="0">
 <segment>
 <pinref part="LED1" gate="G$1" pin="C"/>
+<wire x1="134.62" y1="99.06" x2="134.62" y2="2.54" width="0.1524" layer="91"/>
 <wire x1="134.62" y1="2.54" x2="116.84" y2="2.54" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$72" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P1"/>
-<wire x1="144.78" y1="154.94" x2="144.78" y2="152.4" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$73" class="0">
-<segment>
-<pinref part="U$2" gate="G$1" pin="P2"/>
-<wire x1="147.32" y1="154.94" x2="147.32" y2="152.4" width="0.1524" layer="91"/>
+<pinref part="STM32" gate="G$1" pin="PA0/USART4_TX/WKUP1/ADC_IN0"/>
+<wire x1="134.62" y1="99.06" x2="121.92" y2="99.06" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$74" class="0">
@@ -19033,7 +18939,7 @@ http://www.suntsuinc.com</description>
 </net>
 <net name="N$2" class="0">
 <segment>
-<pinref part="U$4" gate="G$1" pin="2"/>
+<pinref part="L1" gate="G$1" pin="2"/>
 <wire x1="246.38" y1="149.86" x2="248.92" y2="149.86" width="0.1524" layer="91"/>
 <pinref part="U1" gate="G$1" pin="SW"/>
 <wire x1="248.92" y1="149.86" x2="248.92" y2="147.32" width="0.1524" layer="91"/>
@@ -19054,7 +18960,7 @@ http://www.suntsuinc.com</description>
 <label x="259.08" y="104.14" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PA8/TIM1_CH1"/>
+<pinref part="STM32" gate="G$1" pin="PA8/TIM1_CH1"/>
 <wire x1="121.92" y1="78.74" x2="149.86" y2="78.74" width="0.1524" layer="91"/>
 <label x="149.86" y="78.74" size="1.778" layer="95" xref="yes"/>
 </segment>
@@ -19071,7 +18977,7 @@ http://www.suntsuinc.com</description>
 <label x="259.08" y="99.06" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PB15/WKUP7/RTC_REFIN/SPI2_MOSI"/>
+<pinref part="STM32" gate="G$1" pin="PB15/WKUP7/RTC_REFIN/SPI2_MOSI"/>
 <wire x1="121.92" y1="15.24" x2="149.86" y2="15.24" width="0.1524" layer="91"/>
 <label x="149.86" y="15.24" size="1.778" layer="95" xref="yes"/>
 </segment>
@@ -19088,7 +18994,7 @@ http://www.suntsuinc.com</description>
 <label x="259.08" y="93.98" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PB14/SPI2_MISO/I2C2_SDA"/>
+<pinref part="STM32" gate="G$1" pin="PB14/SPI2_MISO/I2C2_SDA"/>
 <wire x1="121.92" y1="17.78" x2="149.86" y2="17.78" width="0.1524" layer="91"/>
 <label x="149.86" y="17.78" size="1.778" layer="95" xref="yes"/>
 </segment>
@@ -19105,12 +19011,12 @@ http://www.suntsuinc.com</description>
 <label x="259.08" y="88.9" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PB13/SPI2_SCK/I2C2_SCL"/>
+<pinref part="STM32" gate="G$1" pin="PB13/SPI2_SCK/I2C2_SCL"/>
 <wire x1="121.92" y1="20.32" x2="149.86" y2="20.32" width="0.1524" layer="91"/>
 <label x="149.86" y="20.32" size="1.778" layer="95" xref="yes"/>
 </segment>
 </net>
-<net name="N$8" class="0">
+<net name="B_OUT" class="0">
 <segment>
 <pinref part="U2" gate="G$1" pin="O3"/>
 <wire x1="292.1" y1="99.06" x2="294.64" y2="99.06" width="0.1524" layer="91"/>
@@ -19120,9 +19026,10 @@ http://www.suntsuinc.com</description>
 <wire x1="309.88" y1="99.06" x2="294.64" y2="99.06" width="0.1524" layer="91"/>
 <junction x="294.64" y="99.06"/>
 <pinref part="AB" gate="G$1" pin="4"/>
+<label x="297.18" y="99.06" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$9" class="0">
+<net name="C_OUT" class="0">
 <segment>
 <pinref part="U2" gate="G$1" pin="O5"/>
 <wire x1="292.1" y1="93.98" x2="294.64" y2="93.98" width="0.1524" layer="91"/>
@@ -19132,9 +19039,10 @@ http://www.suntsuinc.com</description>
 <wire x1="309.88" y1="91.44" x2="294.64" y2="91.44" width="0.1524" layer="91"/>
 <junction x="294.64" y="91.44"/>
 <pinref part="CD" gate="G$1" pin="2"/>
+<label x="297.18" y="91.44" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$10" class="0">
+<net name="D_OUT" class="0">
 <segment>
 <pinref part="U2" gate="G$1" pin="O7"/>
 <wire x1="292.1" y1="88.9" x2="294.64" y2="88.9" width="0.1524" layer="91"/>
@@ -19144,6 +19052,7 @@ http://www.suntsuinc.com</description>
 <junction x="294.64" y="86.36"/>
 <pinref part="CD" gate="G$1" pin="4"/>
 <wire x1="294.64" y1="86.36" x2="309.88" y2="86.36" width="0.1524" layer="91"/>
+<label x="297.18" y="86.36" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="X_VDD" class="0">
@@ -19185,7 +19094,7 @@ http://www.suntsuinc.com</description>
 <pinref part="R4" gate="G$1" pin="2"/>
 </segment>
 </net>
-<net name="N$12" class="0">
+<net name="A_OUT" class="0">
 <segment>
 <pinref part="U2" gate="G$1" pin="O2"/>
 <pinref part="U2" gate="G$1" pin="O1"/>
@@ -19195,6 +19104,7 @@ http://www.suntsuinc.com</description>
 <pinref part="AB" gate="G$1" pin="2"/>
 <wire x1="294.64" y1="104.14" x2="309.88" y2="104.14" width="0.1524" layer="91"/>
 <junction x="294.64" y="104.14"/>
+<label x="297.18" y="104.14" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="V_VALVE" class="0">
@@ -19237,7 +19147,7 @@ http://www.suntsuinc.com</description>
 <label x="226.06" y="134.62" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PB12"/>
+<pinref part="STM32" gate="G$1" pin="PB12"/>
 <wire x1="121.92" y1="22.86" x2="149.86" y2="22.86" width="0.1524" layer="91"/>
 <label x="149.86" y="22.86" size="1.778" layer="95" xref="yes"/>
 </segment>
@@ -19259,7 +19169,7 @@ http://www.suntsuinc.com</description>
 <label x="256.54" y="127" size="1.778" layer="95" rot="R270" xref="yes"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PB1/ADC_IN9/TIM3_CH4"/>
+<pinref part="STM32" gate="G$1" pin="PB1/ADC_IN9/TIM3_CH4"/>
 <wire x1="121.92" y1="50.8" x2="149.86" y2="50.8" width="0.1524" layer="91"/>
 <label x="149.86" y="50.8" size="1.778" layer="95" xref="yes"/>
 </segment>
@@ -19295,7 +19205,7 @@ http://www.suntsuinc.com</description>
 <label x="302.26" y="10.16" size="1.778" layer="95" xref="yes"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PA7/ADC_IN7/SPI1_MOSI/TIM3_CH2"/>
+<pinref part="STM32" gate="G$1" pin="PA7/ADC_IN7/SPI1_MOSI/TIM3_CH2"/>
 <wire x1="121.92" y1="81.28" x2="149.86" y2="81.28" width="0.1524" layer="91"/>
 <label x="149.86" y="81.28" size="1.778" layer="95" xref="yes"/>
 </segment>
@@ -19307,7 +19217,7 @@ http://www.suntsuinc.com</description>
 <label x="215.9" y="17.78" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PA6/ADC_IN6/SPI1_MISO/TIM3_CH1"/>
+<pinref part="STM32" gate="G$1" pin="PA6/ADC_IN6/SPI1_MISO/TIM3_CH1"/>
 <wire x1="121.92" y1="83.82" x2="149.86" y2="83.82" width="0.1524" layer="91"/>
 <label x="149.86" y="83.82" size="1.778" layer="95" xref="yes"/>
 </segment>
@@ -19397,7 +19307,7 @@ http://www.suntsuinc.com</description>
 <label x="302.26" y="-76.2" size="1.778" layer="95" xref="yes"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PB11/I2C2_SDA/TIM2_C4/USART3_RX"/>
+<pinref part="STM32" gate="G$1" pin="PB11/I2C2_SDA/TIM2_C4/USART3_RX"/>
 <wire x1="121.92" y1="25.4" x2="149.86" y2="25.4" width="0.1524" layer="91"/>
 <label x="149.86" y="25.4" size="1.778" layer="95" xref="yes"/>
 </segment>
@@ -19409,7 +19319,7 @@ http://www.suntsuinc.com</description>
 <label x="215.9" y="-68.58" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PB10/I2C2_SCL/TIM2_CH3/USART3_TX"/>
+<pinref part="STM32" gate="G$1" pin="PB10/I2C2_SCL/TIM2_CH3/USART3_TX"/>
 <wire x1="121.92" y1="27.94" x2="149.86" y2="27.94" width="0.1524" layer="91"/>
 <label x="149.86" y="27.94" size="1.778" layer="95" xref="yes"/>
 </segment>
@@ -19471,7 +19381,7 @@ http://www.suntsuinc.com</description>
 <label x="350.52" y="132.08" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PB0/ADC_IN8/TIM3_CH3"/>
+<pinref part="STM32" gate="G$1" pin="PB0/ADC_IN8/TIM3_CH3"/>
 <wire x1="121.92" y1="53.34" x2="149.86" y2="53.34" width="0.1524" layer="91"/>
 <label x="149.86" y="53.34" size="1.778" layer="95" xref="yes"/>
 </segment>
@@ -19480,7 +19390,7 @@ http://www.suntsuinc.com</description>
 <segment>
 <pinref part="LED3" gate="G$1" pin="C"/>
 <wire x1="139.7" y1="-17.78" x2="116.84" y2="-17.78" width="0.1524" layer="91"/>
-<pinref part="STM32F001" gate="G$1" pin="PA2/ADC_IN2/WKUP4USART2_TX"/>
+<pinref part="STM32" gate="G$1" pin="PA2/ADC_IN2/WKUP4USART2_TX"/>
 <wire x1="121.92" y1="93.98" x2="139.7" y2="93.98" width="0.1524" layer="91"/>
 <wire x1="139.7" y1="93.98" x2="139.7" y2="-17.78" width="0.1524" layer="91"/>
 </segment>
@@ -19495,7 +19405,7 @@ http://www.suntsuinc.com</description>
 <segment>
 <pinref part="LED4" gate="G$1" pin="C"/>
 <wire x1="142.24" y1="-27.94" x2="116.84" y2="-27.94" width="0.1524" layer="91"/>
-<pinref part="STM32F001" gate="G$1" pin="PA3/ADC_IN3/COMP2_INP/USART2_RX"/>
+<pinref part="STM32" gate="G$1" pin="PA3/ADC_IN3/COMP2_INP/USART2_RX"/>
 <wire x1="142.24" y1="-27.94" x2="142.24" y2="91.44" width="0.1524" layer="91"/>
 <wire x1="142.24" y1="91.44" x2="121.92" y2="91.44" width="0.1524" layer="91"/>
 </segment>
@@ -19510,7 +19420,7 @@ http://www.suntsuinc.com</description>
 <segment>
 <pinref part="LED5" gate="G$1" pin="C"/>
 <wire x1="144.78" y1="-38.1" x2="116.84" y2="-38.1" width="0.1524" layer="91"/>
-<pinref part="STM32F001" gate="G$1" pin="PA4/ADC_IN4/DAC_OUT1"/>
+<pinref part="STM32" gate="G$1" pin="PA4/ADC_IN4/DAC_OUT1"/>
 <wire x1="121.92" y1="88.9" x2="144.78" y2="88.9" width="0.1524" layer="91"/>
 <wire x1="144.78" y1="88.9" x2="144.78" y2="-38.1" width="0.1524" layer="91"/>
 </segment>
@@ -19524,14 +19434,14 @@ http://www.suntsuinc.com</description>
 <net name="SWDIO1" class="0">
 <segment>
 <wire x1="124.46" y1="154.94" x2="124.46" y2="66.04" width="0.1524" layer="91"/>
-<pinref part="STM32F001" gate="G$1" pin="PA13/SWDIO"/>
+<pinref part="STM32" gate="G$1" pin="PA13/SWDIO"/>
 <wire x1="124.46" y1="66.04" x2="121.92" y2="66.04" width="0.1524" layer="91"/>
 <pinref part="U$2" gate="G$1" pin="JTMS/SWDIO"/>
 </segment>
 </net>
 <net name="SWCLK1" class="0">
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PA14/USART2_TX/SWCLK"/>
+<pinref part="STM32" gate="G$1" pin="PA14/USART2_TX/SWCLK"/>
 <wire x1="121.92" y1="63.5" x2="127" y2="63.5" width="0.1524" layer="91"/>
 <wire x1="127" y1="63.5" x2="127" y2="154.94" width="0.1524" layer="91"/>
 <pinref part="U$2" gate="G$1" pin="JTCK/SWCLK"/>
@@ -19539,8 +19449,8 @@ http://www.suntsuinc.com</description>
 </net>
 <net name="N$71" class="0">
 <segment>
-<pinref part="CRYSTAL" gate="G$1" pin="1"/>
-<pinref part="STM32F001" gate="G$1" pin="PC15/OSC32_OUT"/>
+<pinref part="XTAL" gate="G$1" pin="1"/>
+<pinref part="STM32" gate="G$1" pin="PC15/OSC32_OUT"/>
 <wire x1="20.32" y1="15.24" x2="27.94" y2="15.24" width="0.1524" layer="91"/>
 <pinref part="CL4" gate="G$1" pin="2"/>
 <junction x="20.32" y="15.24"/>
@@ -19548,28 +19458,20 @@ http://www.suntsuinc.com</description>
 </net>
 <net name="N$27" class="0">
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="PC14/OSC32_IN"/>
+<pinref part="STM32" gate="G$1" pin="PC14/OSC32_IN"/>
 <wire x1="27.94" y1="17.78" x2="25.4" y2="17.78" width="0.1524" layer="91"/>
 <wire x1="25.4" y1="17.78" x2="25.4" y2="20.32" width="0.1524" layer="91"/>
-<pinref part="CRYSTAL" gate="G$1" pin="2"/>
+<pinref part="XTAL" gate="G$1" pin="2"/>
 <wire x1="25.4" y1="20.32" x2="20.32" y2="20.32" width="0.1524" layer="91"/>
 <pinref part="CL3" gate="G$1" pin="2"/>
 <junction x="20.32" y="20.32"/>
-</segment>
-</net>
-<net name="N$28" class="0">
-<segment>
-<wire x1="134.62" y1="99.06" x2="134.62" y2="2.54" width="0.1524" layer="91"/>
-<wire x1="134.62" y1="2.54" x2="116.84" y2="2.54" width="0.1524" layer="91"/>
-<pinref part="STM32F001" gate="G$1" pin="PA0/USART4_TX/WKUP1/ADC_IN0"/>
-<wire x1="134.62" y1="99.06" x2="121.92" y2="99.06" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$29" class="0">
 <segment>
 <pinref part="LED2" gate="G$1" pin="C"/>
 <wire x1="137.16" y1="-7.62" x2="116.84" y2="-7.62" width="0.1524" layer="91"/>
-<pinref part="STM32F001" gate="G$1" pin="PA1/ADC_IN1/COMP1_INP/USART4_RX"/>
+<pinref part="STM32" gate="G$1" pin="PA1/ADC_IN1/COMP1_INP/USART4_RX"/>
 <wire x1="121.92" y1="96.52" x2="137.16" y2="96.52" width="0.1524" layer="91"/>
 <wire x1="137.16" y1="96.52" x2="137.16" y2="-7.62" width="0.1524" layer="91"/>
 </segment>
@@ -19582,12 +19484,10 @@ http://www.suntsuinc.com</description>
 </net>
 <net name="V+" class="0">
 <segment>
-<pinref part="STM32F001" gate="G$1" pin="VBATT(P1)"/>
+<pinref part="STM32" gate="G$1" pin="VBATT(P1)"/>
 <wire x1="27.94" y1="99.06" x2="25.4" y2="99.06" width="0.1524" layer="91"/>
-<pinref part="SUPPLY2" gate="1" pin="V+"/>
 <wire x1="25.4" y1="99.06" x2="25.4" y2="101.6" width="0.1524" layer="91"/>
 <pinref part="SUPPLY4" gate="1" pin="V+"/>
-<junction x="25.4" y="101.6"/>
 </segment>
 </net>
 </nets>
