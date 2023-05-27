@@ -15524,8 +15524,8 @@ I-02553</description>
 <variantdefs>
 </variantdefs>
 <classes>
-<class number="0" name="default" width="0.254" drill="0">
-<clearance class="0" value="0.0254"/>
+<class number="0" name="default" width="0.254" drill="0.1524">
+<clearance class="0" value="0.127"/>
 </class>
 </classes>
 <parts>
