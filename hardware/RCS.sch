@@ -18027,7 +18027,7 @@ http://www.suntsuinc.com</description>
 <part name="GND1" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 <part name="U3" library="HX711" deviceset="HX711" device=""/>
 <part name="LOAD_X" library="con-jst" library_urn="urn:adsk.eagle:library:156" deviceset="?4B-ZR" device="S" package3d_urn="urn:adsk.eagle:package:7641/1"/>
-<part name="PRESSURE" library="jst" deviceset="B3B-ZR" device=""/>
+<part name="PRES1" library="jst" deviceset="B3B-ZR" device=""/>
 <part name="GND2" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 <part name="C1" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603" package3d_urn="urn:adsk.eagle:package:23616/2" value="4.7µF"/>
 <part name="C2" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603" package3d_urn="urn:adsk.eagle:package:23616/2" value="2.2µF"/>
@@ -18106,6 +18106,14 @@ http://www.suntsuinc.com</description>
 <part name="CL4" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603K" package3d_urn="urn:adsk.eagle:package:23680/2" value="15pF"/>
 <part name="LED2" library="led" library_urn="urn:adsk.eagle:library:259" deviceset="LED" device="CHIP-LED0603" package3d_urn="urn:adsk.eagle:package:15819/3"/>
 <part name="R11" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="1k"/>
+<part name="PRES2" library="jst" deviceset="B3B-ZR" device=""/>
+<part name="P+6" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="VCC" device=""/>
+<part name="GND28" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
+<part name="C20" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="C-EU" device="C0603" package3d_urn="urn:adsk.eagle:package:23616/2"/>
+<part name="GND29" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
+<part name="R17" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="10k"/>
+<part name="R18" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="15k"/>
+<part name="GND30" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 </parts>
 <sheets>
 <sheet>
@@ -18208,9 +18216,9 @@ http://www.suntsuinc.com</description>
 <instance part="LOAD_X" gate="-4" x="355.6" y="22.86" smashed="yes">
 <attribute name="NAME" x="356.616" y="22.098" size="1.524" layer="95"/>
 </instance>
-<instance part="PRESSURE" gate="G$1" x="383.54" y="134.62" smashed="yes">
-<attribute name="NAME" x="381" y="140.462" size="1.27" layer="95"/>
-<attribute name="VALUE" x="381" y="127.762" size="1.27" layer="96"/>
+<instance part="PRES1" gate="G$1" x="391.16" y="160.02" smashed="yes">
+<attribute name="NAME" x="388.62" y="165.862" size="1.27" layer="95"/>
+<attribute name="VALUE" x="388.62" y="153.162" size="1.27" layer="96"/>
 </instance>
 <instance part="GND2" gate="1" x="332.74" y="-5.08" smashed="yes">
 <attribute name="VALUE" x="330.2" y="-7.62" size="1.778" layer="96"/>
@@ -18311,14 +18319,14 @@ http://www.suntsuinc.com</description>
 <instance part="GND18" gate="1" x="220.98" y="-5.08" smashed="yes">
 <attribute name="VALUE" x="218.44" y="-7.62" size="1.778" layer="96"/>
 </instance>
-<instance part="P+1" gate="VCC" x="368.3" y="144.78" smashed="yes">
-<attribute name="VALUE" x="365.76" y="142.24" size="1.778" layer="96" rot="R90"/>
+<instance part="P+1" gate="VCC" x="375.92" y="170.18" smashed="yes">
+<attribute name="VALUE" x="373.38" y="167.64" size="1.778" layer="96" rot="R90"/>
 </instance>
 <instance part="P+2" gate="VCC" x="220.98" y="53.34" smashed="yes">
 <attribute name="VALUE" x="218.44" y="50.8" size="1.778" layer="96" rot="R90"/>
 </instance>
-<instance part="GND3" gate="1" x="373.38" y="119.38" smashed="yes">
-<attribute name="VALUE" x="370.84" y="116.84" size="1.778" layer="96"/>
+<instance part="GND3" gate="1" x="381" y="144.78" smashed="yes">
+<attribute name="VALUE" x="378.46" y="142.24" size="1.778" layer="96"/>
 </instance>
 <instance part="U4" gate="G$1" x="266.7" y="-66.04" smashed="yes" rot="MR0">
 <attribute name="NAME" x="266.7" y="-66.04" size="2.54" layer="95" rot="MR0"/>
@@ -18404,23 +18412,23 @@ http://www.suntsuinc.com</description>
 <instance part="P+5" gate="VCC" x="220.98" y="-33.02" smashed="yes">
 <attribute name="VALUE" x="218.44" y="-35.56" size="1.778" layer="96" rot="R90"/>
 </instance>
-<instance part="C19" gate="G$1" x="368.3" y="127" smashed="yes">
-<attribute name="NAME" x="369.824" y="127.381" size="1.778" layer="95"/>
-<attribute name="VALUE" x="369.824" y="122.301" size="1.778" layer="96"/>
+<instance part="C19" gate="G$1" x="375.92" y="152.4" smashed="yes">
+<attribute name="NAME" x="377.444" y="152.781" size="1.778" layer="95"/>
+<attribute name="VALUE" x="377.444" y="147.701" size="1.778" layer="96"/>
 </instance>
-<instance part="GND26" gate="1" x="368.3" y="119.38" smashed="yes">
-<attribute name="VALUE" x="365.76" y="116.84" size="1.778" layer="96"/>
+<instance part="GND26" gate="1" x="375.92" y="144.78" smashed="yes">
+<attribute name="VALUE" x="373.38" y="142.24" size="1.778" layer="96"/>
 </instance>
-<instance part="R15" gate="G$1" x="360.68" y="132.08" smashed="yes">
-<attribute name="NAME" x="356.87" y="133.5786" size="1.778" layer="95"/>
-<attribute name="VALUE" x="356.87" y="128.778" size="1.778" layer="96"/>
+<instance part="R15" gate="G$1" x="368.3" y="157.48" smashed="yes">
+<attribute name="NAME" x="364.49" y="158.9786" size="1.778" layer="95"/>
+<attribute name="VALUE" x="364.49" y="154.178" size="1.778" layer="96"/>
 </instance>
-<instance part="R16" gate="G$1" x="353.06" y="124.46" smashed="yes" rot="R90">
-<attribute name="NAME" x="351.5614" y="120.65" size="1.778" layer="95" rot="R90"/>
-<attribute name="VALUE" x="356.362" y="120.65" size="1.778" layer="96" rot="R90"/>
+<instance part="R16" gate="G$1" x="360.68" y="149.86" smashed="yes" rot="R90">
+<attribute name="NAME" x="359.1814" y="146.05" size="1.778" layer="95" rot="R90"/>
+<attribute name="VALUE" x="363.982" y="146.05" size="1.778" layer="96" rot="R90"/>
 </instance>
-<instance part="GND27" gate="1" x="353.06" y="116.84" smashed="yes">
-<attribute name="VALUE" x="350.52" y="114.3" size="1.778" layer="96"/>
+<instance part="GND27" gate="1" x="360.68" y="142.24" smashed="yes">
+<attribute name="VALUE" x="358.14" y="139.7" size="1.778" layer="96"/>
 </instance>
 <instance part="LED3" gate="G$1" x="111.76" y="-17.78" smashed="yes" rot="R90">
 <attribute name="NAME" x="118.872" y="-14.224" size="1.778" layer="95" rot="R180"/>
@@ -18500,6 +18508,34 @@ http://www.suntsuinc.com</description>
 <instance part="R11" gate="G$1" x="104.14" y="-7.62" smashed="yes">
 <attribute name="NAME" x="100.33" y="-6.1214" size="1.778" layer="95"/>
 <attribute name="VALUE" x="100.33" y="-10.922" size="1.778" layer="96"/>
+</instance>
+<instance part="PRES2" gate="G$1" x="391.16" y="124.46" smashed="yes">
+<attribute name="NAME" x="388.62" y="130.302" size="1.27" layer="95"/>
+<attribute name="VALUE" x="388.62" y="117.602" size="1.27" layer="96"/>
+</instance>
+<instance part="P+6" gate="VCC" x="375.92" y="134.62" smashed="yes">
+<attribute name="VALUE" x="373.38" y="132.08" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="GND28" gate="1" x="381" y="109.22" smashed="yes">
+<attribute name="VALUE" x="378.46" y="106.68" size="1.778" layer="96"/>
+</instance>
+<instance part="C20" gate="G$1" x="375.92" y="116.84" smashed="yes">
+<attribute name="NAME" x="377.444" y="117.221" size="1.778" layer="95"/>
+<attribute name="VALUE" x="377.444" y="112.141" size="1.778" layer="96"/>
+</instance>
+<instance part="GND29" gate="1" x="375.92" y="109.22" smashed="yes">
+<attribute name="VALUE" x="373.38" y="106.68" size="1.778" layer="96"/>
+</instance>
+<instance part="R17" gate="G$1" x="368.3" y="121.92" smashed="yes">
+<attribute name="NAME" x="364.49" y="123.4186" size="1.778" layer="95"/>
+<attribute name="VALUE" x="364.49" y="118.618" size="1.778" layer="96"/>
+</instance>
+<instance part="R18" gate="G$1" x="360.68" y="114.3" smashed="yes" rot="R90">
+<attribute name="NAME" x="359.1814" y="110.49" size="1.778" layer="95" rot="R90"/>
+<attribute name="VALUE" x="363.982" y="110.49" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="GND30" gate="1" x="360.68" y="106.68" smashed="yes">
+<attribute name="VALUE" x="358.14" y="104.14" size="1.778" layer="96"/>
 </instance>
 </instances>
 <busses>
@@ -18608,9 +18644,9 @@ http://www.suntsuinc.com</description>
 <pinref part="GND18" gate="1" pin="GND"/>
 </segment>
 <segment>
-<pinref part="PRESSURE" gate="G$1" pin="2"/>
-<wire x1="375.92" y1="134.62" x2="373.38" y2="134.62" width="0.1524" layer="91"/>
-<wire x1="373.38" y1="134.62" x2="373.38" y2="121.92" width="0.1524" layer="91"/>
+<pinref part="PRES1" gate="G$1" pin="2"/>
+<wire x1="383.54" y1="160.02" x2="381" y2="160.02" width="0.1524" layer="91"/>
+<wire x1="381" y1="160.02" x2="381" y2="147.32" width="0.1524" layer="91"/>
 <pinref part="GND3" gate="1" pin="GND"/>
 </segment>
 <segment>
@@ -18707,6 +18743,20 @@ http://www.suntsuinc.com</description>
 <junction x="12.7" y="15.24"/>
 <pinref part="GND9" gate="1" pin="GND"/>
 </segment>
+<segment>
+<pinref part="PRES2" gate="G$1" pin="2"/>
+<wire x1="383.54" y1="124.46" x2="381" y2="124.46" width="0.1524" layer="91"/>
+<wire x1="381" y1="124.46" x2="381" y2="111.76" width="0.1524" layer="91"/>
+<pinref part="GND28" gate="1" pin="GND"/>
+</segment>
+<segment>
+<pinref part="C20" gate="G$1" pin="2"/>
+<pinref part="GND29" gate="1" pin="GND"/>
+</segment>
+<segment>
+<pinref part="R18" gate="G$1" pin="1"/>
+<pinref part="GND30" gate="1" pin="GND"/>
+</segment>
 </net>
 <net name="VCC" class="0">
 <segment>
@@ -18723,13 +18773,13 @@ http://www.suntsuinc.com</description>
 <junction x="78.74" y="132.08"/>
 </segment>
 <segment>
-<pinref part="PRESSURE" gate="G$1" pin="1"/>
-<wire x1="375.92" y1="137.16" x2="368.3" y2="137.16" width="0.1524" layer="91"/>
-<wire x1="368.3" y1="137.16" x2="368.3" y2="142.24" width="0.1524" layer="91"/>
+<pinref part="PRES1" gate="G$1" pin="1"/>
+<wire x1="383.54" y1="162.56" x2="375.92" y2="162.56" width="0.1524" layer="91"/>
+<wire x1="375.92" y1="162.56" x2="375.92" y2="167.64" width="0.1524" layer="91"/>
 <pinref part="P+1" gate="VCC" pin="VCC"/>
 <pinref part="C19" gate="G$1" pin="1"/>
-<wire x1="368.3" y1="129.54" x2="368.3" y2="137.16" width="0.1524" layer="91"/>
-<junction x="368.3" y="137.16"/>
+<wire x1="375.92" y1="154.94" x2="375.92" y2="162.56" width="0.1524" layer="91"/>
+<junction x="375.92" y="162.56"/>
 </segment>
 <segment>
 <pinref part="T1" gate="G$1" pin="E"/>
@@ -18756,6 +18806,15 @@ http://www.suntsuinc.com</description>
 <pinref part="P+5" gate="VCC" pin="VCC"/>
 <wire x1="220.98" y1="-35.56" x2="220.98" y2="-40.64" width="0.1524" layer="91"/>
 <junction x="220.98" y="-40.64"/>
+</segment>
+<segment>
+<pinref part="PRES2" gate="G$1" pin="1"/>
+<wire x1="383.54" y1="127" x2="375.92" y2="127" width="0.1524" layer="91"/>
+<wire x1="375.92" y1="127" x2="375.92" y2="132.08" width="0.1524" layer="91"/>
+<pinref part="P+6" gate="VCC" pin="VCC"/>
+<pinref part="C20" gate="G$1" pin="1"/>
+<wire x1="375.92" y1="119.38" x2="375.92" y2="127" width="0.1524" layer="91"/>
+<junction x="375.92" y="127"/>
 </segment>
 </net>
 <net name="VDD" class="0">
@@ -19365,20 +19424,20 @@ http://www.suntsuinc.com</description>
 </net>
 <net name="N$17" class="0">
 <segment>
-<pinref part="PRESSURE" gate="G$1" pin="3"/>
-<wire x1="375.92" y1="132.08" x2="365.76" y2="132.08" width="0.1524" layer="91"/>
+<pinref part="PRES1" gate="G$1" pin="3"/>
+<wire x1="383.54" y1="157.48" x2="373.38" y2="157.48" width="0.1524" layer="91"/>
 <pinref part="R15" gate="G$1" pin="2"/>
 </segment>
 </net>
-<net name="PRESSURE" class="0">
+<net name="PRESSURE_1" class="0">
 <segment>
 <pinref part="R15" gate="G$1" pin="1"/>
-<wire x1="355.6" y1="132.08" x2="353.06" y2="132.08" width="0.1524" layer="91"/>
+<wire x1="363.22" y1="157.48" x2="360.68" y2="157.48" width="0.1524" layer="91"/>
 <pinref part="R16" gate="G$1" pin="2"/>
-<wire x1="353.06" y1="132.08" x2="353.06" y2="129.54" width="0.1524" layer="91"/>
-<wire x1="353.06" y1="132.08" x2="350.52" y2="132.08" width="0.1524" layer="91"/>
-<junction x="353.06" y="132.08"/>
-<label x="350.52" y="132.08" size="1.778" layer="95" rot="R180" xref="yes"/>
+<wire x1="360.68" y1="157.48" x2="360.68" y2="154.94" width="0.1524" layer="91"/>
+<wire x1="360.68" y1="157.48" x2="350.52" y2="157.48" width="0.1524" layer="91"/>
+<junction x="360.68" y="157.48"/>
+<label x="350.52" y="157.48" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
 <segment>
 <pinref part="STM32" gate="G$1" pin="PB0/ADC_IN8/TIM3_CH3"/>
@@ -19488,6 +19547,29 @@ http://www.suntsuinc.com</description>
 <wire x1="27.94" y1="99.06" x2="25.4" y2="99.06" width="0.1524" layer="91"/>
 <wire x1="25.4" y1="99.06" x2="25.4" y2="101.6" width="0.1524" layer="91"/>
 <pinref part="SUPPLY4" gate="1" pin="V+"/>
+</segment>
+</net>
+<net name="PRESSURE_2" class="0">
+<segment>
+<pinref part="STM32" gate="G$1" pin="PA5/ADC_IN5/DAC_OUT2/SPI1_SCK"/>
+<wire x1="121.92" y1="86.36" x2="149.86" y2="86.36" width="0.1524" layer="91"/>
+<label x="149.86" y="86.36" size="1.778" layer="95" xref="yes"/>
+</segment>
+<segment>
+<pinref part="R17" gate="G$1" pin="1"/>
+<wire x1="363.22" y1="121.92" x2="360.68" y2="121.92" width="0.1524" layer="91"/>
+<pinref part="R18" gate="G$1" pin="2"/>
+<wire x1="360.68" y1="121.92" x2="360.68" y2="119.38" width="0.1524" layer="91"/>
+<wire x1="360.68" y1="121.92" x2="350.52" y2="121.92" width="0.1524" layer="91"/>
+<junction x="360.68" y="121.92"/>
+<label x="350.52" y="121.92" size="1.778" layer="95" rot="R180" xref="yes"/>
+</segment>
+</net>
+<net name="N$8" class="0">
+<segment>
+<pinref part="PRES2" gate="G$1" pin="3"/>
+<wire x1="383.54" y1="121.92" x2="373.38" y2="121.92" width="0.1524" layer="91"/>
+<pinref part="R17" gate="G$1" pin="2"/>
 </segment>
 </net>
 </nets>
