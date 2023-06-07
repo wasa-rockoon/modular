@@ -1,4 +1,5 @@
 *#?
 *.zip
+*.pro
 
 .DS_Store

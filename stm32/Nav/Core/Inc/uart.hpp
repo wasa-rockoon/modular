@@ -10,7 +10,7 @@
 
 #include "main.h"
 
-#define RXBUFSIZE 64
+#define RXBUFSIZE 256
 #define TXBUFSIZE 0
 
 

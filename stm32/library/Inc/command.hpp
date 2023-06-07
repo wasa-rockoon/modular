@@ -95,15 +95,19 @@ public:
 	Queue();
 
 	inline uint8_t size() const { return size_; };
+	inline bool isEmpty() const { return size_ == 0; };
+	inline bool isFull() const { return size_ == N; };
 	inline Command& first()  { return buf[read_ptr_]; };
 	inline Command& last() { return buf[(write_ptr_ - 1) % N]; };
+	inline const Command& first() const { return buf[read_ptr_]; };
+	inline const Command& last() const { return buf[(write_ptr_ - 1) % N]; };
 
 //	bool push(Command& command);
 //	bool push();
 //	bool pop(Command& command);
 //	bool pop();
 //
-	bool push(Command& command) {
+	bool push(const Command& command) {
 		if (size_ == N) return false;
 
 		buf[write_ptr_] = command;
@@ -158,14 +162,35 @@ public:
 	inline bool isReceiving() { return receiving_ != -1; };
 	inline bool isSending() { return tx.size() > 0; };
 
+	inline unsigned getErrorCount() const { return error_count_; };
+
 protected:
 	int8_t receiving_;
 	int8_t sending_;
+
+	inline void error() { error_count_++; };
+
+private:
+	unsigned error_count_;
+
 };
+
 
 class BinaryChannel: public Channel<BIN_TX_QUEUE_SIZE> {
+public:
+	BinaryChannel();
 
+	bool read(const uint8_t* data, uint8_t len);
+
+	unsigned write(uint8_t* data);
+	unsigned nextWriteSize() const;
+
+private:
+	uint8_t rx_buf_[6];
+	uint8_t rx_buf_count_;
+	uint8_t rx_buf_max_;
 };
+
 
 class HexChannel: public Channel<HEX_TX_QUEUE_SIZE> {
 public:

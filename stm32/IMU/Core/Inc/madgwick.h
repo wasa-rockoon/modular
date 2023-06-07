@@ -17,7 +17,7 @@
 #ifndef MadgwickAHRS_h
 #define MadgwickAHRS_h
 #include <math.h>
-#include "Algebra.hpp"
+#include "algebra.hpp"
 
 //--------------------------------------------------------------------------------------------
 // Variable declaration

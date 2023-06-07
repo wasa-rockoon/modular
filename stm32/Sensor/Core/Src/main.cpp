@@ -162,9 +162,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		diag.update(HAL_GetTick());
 
 
+//		if (charging) {
 
-		HAL_GPIO_WritePin(CHARGE_GPIO_Port, CHARGE_Pin, GPIO_PIN_SET);
+//		HAL_GPIO_WritePin(CHARGE_GPIO_Port, CHARGE_Pin, GPIO_PIN_SET);
 
+//		}
 
 
 #ifndef DEBUG
@@ -179,7 +181,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     	diag.setStatus(STATUS_0, !flight_mode);
     	diag.setStatus(STATUS_1, !env_temp_ok);
     	diag.setStatus(STATUS_2, !ign_temp_ok);
-    	diag.setStatus(STATUS_3, charging);
+//    	diag.setStatus(STATUS_3, charging);
 
 		Command flight('F', 0, 0, 2);
 

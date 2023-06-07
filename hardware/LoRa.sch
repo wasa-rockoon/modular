@@ -13411,6 +13411,11 @@ http://www.suntsuinc.com</description>
 <wire x1="266.7" y1="96.52" x2="264.16" y2="96.52" width="0.1524" layer="91"/>
 <label x="264.16" y="96.52" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
+<segment>
+<pinref part="STM32F001" gate="G$1" pin="PB11/I2C2_SDA/TIM2_C4/USART3_RX"/>
+<wire x1="121.92" y1="25.4" x2="144.78" y2="25.4" width="0.1524" layer="91"/>
+<label x="144.78" y="25.4" size="1.778" layer="95" xref="yes"/>
+</segment>
 </net>
 <net name="LORA2_M0" class="0">
 <segment>
@@ -13476,13 +13481,6 @@ http://www.suntsuinc.com</description>
 <wire x1="137.16" y1="99.06" x2="137.16" y2="2.54" width="0.1524" layer="91"/>
 <pinref part="LED1" gate="G$1" pin="C"/>
 <wire x1="137.16" y1="2.54" x2="116.84" y2="2.54" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="LORA_AUX" class="0">
-<segment>
-<pinref part="STM32F001" gate="G$1" pin="PB11/I2C2_SDA/TIM2_C4/USART3_RX"/>
-<wire x1="121.92" y1="25.4" x2="144.78" y2="25.4" width="0.1524" layer="91"/>
-<label x="144.78" y="25.4" size="1.778" layer="95" xref="yes"/>
 </segment>
 </net>
 </nets>

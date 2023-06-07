@@ -38,7 +38,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define TEST
+//#define TEST
 
 #define CAN_SEND_TIMEOUT_TICK 10
 
@@ -48,9 +48,9 @@
 #define GPS_LOST_TICK 10000
 
 #define PRESSURE_FILTER_A 0.5
-#define ALTITUDE_FILTER_A 0.5
+#define SPEED_FILTER_A 0.99
 
-#define ALTITUDE_DIFF 2000
+#define ALTITUDE_DIFF 1000
 
 /* USER CODE END PD */
 
@@ -135,7 +135,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if (htim == &htim3) {
     	// Sample
 
-    	float p_altitude_raw_p = p_altitude_raw;
+    	float p_altitude_p = p_altitude;
 
 #ifdef TEST
     	pressure_raw    -= 10;
@@ -148,19 +148,20 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     	temperature_raw = bmp280.readTemperature();
 #endif
 
-    	p_v_speed_raw   = (p_altitude_raw - p_altitude_raw_p) * SAMPLE_FREQ;
-
     	pressure    = pressure    * (1 - PRESSURE_FILTER_A) + pressure_raw    * PRESSURE_FILTER_A;
     	p_altitude  = p_altitude  * (1 - PRESSURE_FILTER_A) + p_altitude_raw  * PRESSURE_FILTER_A;
     	temperature = temperature * (1 - PRESSURE_FILTER_A) + temperature_raw * PRESSURE_FILTER_A;
-    	p_v_speed   = p_v_speed   * (1 - PRESSURE_FILTER_A) + p_v_speed_raw   * PRESSURE_FILTER_A;
+
+    	p_v_speed_raw  = (p_altitude - p_altitude_p) * SAMPLE_FREQ;
+
+    	p_v_speed   = p_v_speed   * (1 - SPEED_FILTER_A) + p_v_speed_raw * SPEED_FILTER_A;
 
     }
     else if (htim == &htim4) {
 
-    	if (!gps.location.isValid()) {
-    		Measure();
-    	}
+//    	if (!gps.location.isValid()) {
+    	Measure();
+//    	}
 
 
   #ifndef DEBUG
@@ -174,7 +175,7 @@ void Measure() {
 
 	bool location_ok = gps.location.age() < GPS_LOST_TICK;
 	bool altitude_ok = gps.altitude.age() < GPS_LOST_TICK;
-	bool altitude_same = abs(gps.altitude.value() - p_altitude) < ALTITUDE_DIFF;
+	bool altitude_same = abs(gps.altitude.meters() - p_altitude) < ALTITUDE_DIFF;
 
 	diag.setStatus(STATUS_0, !location_ok);
 	diag.setStatus(STATUS_1, !altitude_ok);
@@ -235,12 +236,10 @@ void Measure() {
 //	printf("P %d\n", (int)(pressure));
 //	printf("H %d\n", (int)(p_altitude));
 //	printf("T %d\n", (int)(temperature));
-//	if (gps.location.isValid()) {
-//		printf("GPS: %d\n", gps.location.isValid());
-//		printf("Lat: %d\n", (int)(gps.location.lng() * 1000));
-//		printf("Lng: %d\n", (int)(gps.location.lat() * 1000));
-//		printf("Alt: %d\n", (int)(gps.altitude.meters() * 1000));
-//	}
+//	printf("GPS: %d\n", gps.location.isValid());
+//	printf("Lat: %d\n", (int)(gps.location.lng() * 1000));
+//	printf("Lng: %d\n", (int)(gps.location.lat() * 1000));
+//	printf("Alt: %d\n", (int)(gps.altitude.meters()));
 //	diag.printSummary();
 #endif
 
@@ -356,7 +355,7 @@ int main(void)
 	  }
 
 	  if (gps.location.isValid() && gps.location.isUpdated()) {
-		  Measure();
+//		  Measure();
 	  }
 //
 //	  if (len > 0) {
