@@ -15644,6 +15644,8 @@ I-02553</description>
 <part name="R20" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="1M"/>
 <part name="R21" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-US_" device="R0603" package3d_urn="urn:adsk.eagle:package:23555/3" value="100k"/>
 <part name="GND31" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
+<part name="D7" library="diodes" deviceset="CUHS20S30" device=""/>
+<part name="D8" library="diodes" deviceset="CUHS20S30" device=""/>
 </parts>
 <sheets>
 <sheet>
@@ -15831,8 +15833,8 @@ I-02553</description>
 <attribute name="NAME" x="340.36" y="86.36" size="1.778" layer="95" rot="R270"/>
 <attribute name="VALUE" x="335.28" y="88.9" size="1.778" layer="96" rot="R180"/>
 </instance>
-<instance part="P+1" gate="VCC" x="441.96" y="101.6" smashed="yes" rot="R270">
-<attribute name="VALUE" x="439.42" y="104.14" size="1.778" layer="96"/>
+<instance part="P+1" gate="VCC" x="436.88" y="101.6" smashed="yes" rot="R270">
+<attribute name="VALUE" x="434.34" y="104.14" size="1.778" layer="96"/>
 </instance>
 <instance part="U3" gate="A" x="320.04" y="38.1" smashed="yes" rot="MR0">
 <attribute name="NAME" x="286.647" y="44.68735" size="2.0848" layer="95" ratio="6" rot="SMR0"/>
@@ -15897,8 +15899,8 @@ I-02553</description>
 <attribute name="NAME" x="340.36" y="35.56" size="1.778" layer="95" rot="R270"/>
 <attribute name="VALUE" x="335.28" y="38.1" size="1.778" layer="96" rot="R180"/>
 </instance>
-<instance part="VDD1" gate="G$1" x="441.96" y="50.8" smashed="yes" rot="R270">
-<attribute name="VALUE" x="439.42" y="53.34" size="1.778" layer="96"/>
+<instance part="VDD1" gate="G$1" x="436.88" y="50.8" smashed="yes" rot="R270">
+<attribute name="VALUE" x="434.34" y="53.34" size="1.778" layer="96"/>
 </instance>
 <instance part="C5" gate="G$1" x="251.46" y="27.94" smashed="yes">
 <attribute name="NAME" x="252.984" y="28.321" size="1.778" layer="95"/>
@@ -16050,6 +16052,12 @@ I-02553</description>
 </instance>
 <instance part="GND31" gate="1" x="210.82" y="68.58" smashed="yes">
 <attribute name="VALUE" x="208.28" y="66.04" size="1.778" layer="96"/>
+</instance>
+<instance part="D7" gate="G$1" x="431.8" y="101.6" smashed="yes">
+<attribute name="NAME" x="426.72" y="96.52" size="2.54" layer="95"/>
+</instance>
+<instance part="D8" gate="G$1" x="431.8" y="50.8" smashed="yes">
+<attribute name="NAME" x="426.72" y="45.72" size="2.54" layer="95"/>
 </instance>
 </instances>
 <busses>
@@ -16279,20 +16287,14 @@ I-02553</description>
 <junction x="78.74" y="132.08"/>
 </segment>
 <segment>
-<pinref part="R3" gate="G$1" pin="2"/>
-<wire x1="416.56" y1="101.6" x2="419.1" y2="101.6" width="0.1524" layer="91"/>
-<wire x1="419.1" y1="101.6" x2="439.42" y2="101.6" width="0.1524" layer="91"/>
-<pinref part="U2" gate="G$1" pin="+IN"/>
-<wire x1="401.32" y1="86.36" x2="419.1" y2="86.36" width="0.1524" layer="91"/>
-<wire x1="419.1" y1="86.36" x2="419.1" y2="101.6" width="0.1524" layer="91"/>
-<junction x="419.1" y="101.6"/>
-<pinref part="P+1" gate="VCC" pin="VCC"/>
-</segment>
-<segment>
 <pinref part="U5" gate="G$1" pin="VIN"/>
 <wire x1="281.94" y1="-12.7" x2="279.4" y2="-12.7" width="0.1524" layer="91"/>
 <wire x1="279.4" y1="-12.7" x2="279.4" y2="-10.16" width="0.1524" layer="91"/>
 <pinref part="P+2" gate="VCC" pin="VCC"/>
+</segment>
+<segment>
+<pinref part="D7" gate="G$1" pin="C"/>
+<pinref part="P+1" gate="VCC" pin="VCC"/>
 </segment>
 </net>
 <net name="VDD" class="0">
@@ -16355,16 +16357,6 @@ I-02553</description>
 <junction x="96.52" y="2.54"/>
 </segment>
 <segment>
-<pinref part="R6" gate="G$1" pin="2"/>
-<wire x1="416.56" y1="50.8" x2="419.1" y2="50.8" width="0.1524" layer="91"/>
-<wire x1="419.1" y1="50.8" x2="439.42" y2="50.8" width="0.1524" layer="91"/>
-<pinref part="U4" gate="G$1" pin="+IN"/>
-<wire x1="401.32" y1="35.56" x2="419.1" y2="35.56" width="0.1524" layer="91"/>
-<wire x1="419.1" y1="35.56" x2="419.1" y2="50.8" width="0.1524" layer="91"/>
-<junction x="419.1" y="50.8"/>
-<pinref part="VDD1" gate="G$1" pin="VDD"/>
-</segment>
-<segment>
 <pinref part="U6" gate="G$1" pin="VIN"/>
 <wire x1="281.94" y1="-33.02" x2="279.4" y2="-33.02" width="0.1524" layer="91"/>
 <wire x1="279.4" y1="-33.02" x2="279.4" y2="-30.48" width="0.1524" layer="91"/>
@@ -16374,6 +16366,10 @@ I-02553</description>
 <pinref part="R17" gate="G$1" pin="2"/>
 <pinref part="VDD3" gate="G$1" pin="VDD"/>
 <wire x1="355.6" y1="139.7" x2="355.6" y2="144.78" width="0.1524" layer="91"/>
+</segment>
+<segment>
+<pinref part="D8" gate="G$1" pin="C"/>
+<pinref part="VDD1" gate="G$1" pin="VDD"/>
 </segment>
 </net>
 <net name="VBAT" class="0">
@@ -16941,6 +16937,32 @@ I-02553</description>
 <pinref part="SUPPLY" gate="G$1" pin="3"/>
 <wire x1="353.06" y1="-50.8" x2="340.36" y2="-50.8" width="0.1524" layer="91"/>
 <label x="340.36" y="-50.8" size="1.778" layer="95" rot="R180" xref="yes"/>
+</segment>
+</net>
+<net name="VDD'" class="0">
+<segment>
+<pinref part="R6" gate="G$1" pin="2"/>
+<wire x1="416.56" y1="50.8" x2="419.1" y2="50.8" width="0.1524" layer="91"/>
+<pinref part="U4" gate="G$1" pin="+IN"/>
+<wire x1="401.32" y1="35.56" x2="419.1" y2="35.56" width="0.1524" layer="91"/>
+<wire x1="419.1" y1="35.56" x2="419.1" y2="50.8" width="0.1524" layer="91"/>
+<wire x1="419.1" y1="50.8" x2="426.72" y2="50.8" width="0.1524" layer="91"/>
+<junction x="419.1" y="50.8"/>
+<pinref part="D8" gate="G$1" pin="A"/>
+<label x="419.1" y="50.8" size="1.778" layer="95"/>
+</segment>
+</net>
+<net name="VCC'" class="0">
+<segment>
+<pinref part="R3" gate="G$1" pin="2"/>
+<wire x1="416.56" y1="101.6" x2="419.1" y2="101.6" width="0.1524" layer="91"/>
+<pinref part="U2" gate="G$1" pin="+IN"/>
+<wire x1="401.32" y1="86.36" x2="419.1" y2="86.36" width="0.1524" layer="91"/>
+<wire x1="419.1" y1="86.36" x2="419.1" y2="101.6" width="0.1524" layer="91"/>
+<wire x1="419.1" y1="101.6" x2="426.72" y2="101.6" width="0.1524" layer="91"/>
+<junction x="419.1" y="101.6"/>
+<pinref part="D7" gate="G$1" pin="A"/>
+<label x="419.1" y="101.6" size="1.778" layer="95"/>
 </segment>
 </net>
 </nets>
