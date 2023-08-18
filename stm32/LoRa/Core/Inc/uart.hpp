@@ -10,32 +10,48 @@
 
 #include "main.h"
 
-#define RXBUFSIZE 64
-#define TXBUFSIZE 64
-
 class UART {
 public:
-	UART(UART_HandleTypeDef& huart);
+	UART(UART_HandleTypeDef& huart, uint8_t* buf,
+	    unsigned ring_size, unsigned tail_size);
 
-	bool rxIsEmpty();
-	uint32_t available();
+	bool begin();
 
-	uint8_t read();
-	uint32_t read(uint8_t*& buf);
+	bool rxIsEmpty() {
+	  return rx_read_ptr_ == rx_write_ptr();
+	}
+	unsigned available();
+
+	inline bool write(const uint8_t* buf, unsigned len) {
+	  while (huart_.gState != HAL_UART_STATE_READY);
+//	  HAL_Delay(1);
+	  return HAL_UART_Transmit_DMA(&huart_, buf, len) == HAL_OK;
+	}
+	inline bool write(uint8_t c) {
+	  while (huart_.gState != HAL_UART_STATE_READY);
+//	  HAL_Delay(1);
+	  return HAL_UART_Transmit_DMA(&huart_, &c, 1) == HAL_OK;
+	}
+
+	int16_t read();
+	int16_t peek(unsigned pos = 0);
+	uint8_t* read(unsigned len);
+
 	void clear();
 
-	inline uint8_t* rx_buf() { return rx_buf_; }
-	inline uint8_t* tx_buf() { return tx_buf_; }
+	void changeBaudRate(unsigned baud);
+
 
 protected:
 	UART_HandleTypeDef& huart_;
 
-	uint8_t rx_buf_[RXBUFSIZE];
-	uint8_t tx_buf_[TXBUFSIZE];
+	uint8_t* buf_;
+	unsigned ring_size_;
+	unsigned tail_size_;
 
-	uint32_t rx_read_ptr_;
+	unsigned rx_read_ptr_;
 
-	uint32_t rx_write_ptr();
+	unsigned rx_write_ptr();
 };
 
 

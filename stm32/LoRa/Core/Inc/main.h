@@ -70,6 +70,8 @@ void Error_Handler(void);
 #define LORA2_M1_GPIO_Port GPIOA
 #define LORA2_M0_Pin GPIO_PIN_7
 #define LORA2_M0_GPIO_Port GPIOA
+#define LORA1_AUX_Pin GPIO_PIN_11
+#define LORA1_AUX_GPIO_Port GPIOB
 #define LORA1_M1_Pin GPIO_PIN_11
 #define LORA1_M1_GPIO_Port GPIOA
 #define LORA1_M0_Pin GPIO_PIN_12
