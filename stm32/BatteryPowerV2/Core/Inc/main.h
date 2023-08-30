@@ -58,6 +58,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define SAMPLE_FREQ 1000
+#define TLM_FREQ 10
 #define LED_ERROR_Pin GPIO_PIN_0
 #define LED_ERROR_GPIO_Port GPIOA
 #define LED_STATUS_Pin GPIO_PIN_1
