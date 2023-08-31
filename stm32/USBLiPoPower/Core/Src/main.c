@@ -20,12 +20,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "usb_device.h"
-#include "usbd_cdc_if.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
-#include "command.h"
+#include "app.h"
 
 //#include "usbd_cdc_if.h"
 
@@ -46,7 +44,9 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
- CAN_HandleTypeDef hcan;
+CAN_HandleTypeDef hcan;
+
+IWDG_HandleTypeDef hiwdg;
 
 /* USER CODE BEGIN PV */
 
@@ -56,26 +56,16 @@
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
+static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
-void CAN_Send(uint8_t *data, int length);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-CAN_TxHeaderTypeDef   CanTxHeader;
-CAN_RxHeaderTypeDef   CanRxHeader;
-uint8_t               CanRxData[8];
-uint32_t              CanTxMailbox;
-
-
-#define LOOP_PERIOD         100
 
 //#define DBG
 
 extern void initialise_monitor_handles(void);
-
-HexChannel usb_channel;
-CANChannel can_channel;
 
 /* USER CODE END 0 */
 
@@ -87,7 +77,7 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 
-#ifdef DBG
+#ifdef DEBUG
 	initialise_monitor_handles();
 #endif
 
@@ -113,12 +103,10 @@ int main(void)
   MX_GPIO_Init();
   MX_CAN_Init();
   MX_USB_DEVICE_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
 
-#ifdef DBG
-  printf("Start\n");
-#endif
-
+  setup();
 
   /* USER CODE END 2 */
 
@@ -126,14 +114,15 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, SET);
-
-	  //　CAN_Send("ABCDEFGH", 8);
-
-	  HAL_Delay(LOOP_PERIOD);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+    loop();
+
+#ifndef DEBUG
+    HAL_IWDG_Refresh(&hiwdg);
+#endif
   }
   /* USER CODE END 3 */
 }
@@ -152,8 +141,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -212,11 +202,11 @@ static void MX_CAN_Init(void)
 
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN;
-  hcan.Init.Prescaler = 150;
+  hcan.Init.Prescaler = 8;
   hcan.Init.Mode = CAN_MODE_NORMAL;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan.Init.TimeSeg1 = CAN_BS1_13TQ;
-  hcan.Init.TimeSeg2 = CAN_BS2_2TQ;
+  hcan.Init.TimeSeg1 = CAN_BS1_4TQ;
+  hcan.Init.TimeSeg2 = CAN_BS2_1TQ;
   hcan.Init.TimeTriggeredMode = DISABLE;
   hcan.Init.AutoBusOff = DISABLE;
   hcan.Init.AutoWakeUp = DISABLE;
@@ -229,49 +219,38 @@ static void MX_CAN_Init(void)
   }
   /* USER CODE BEGIN CAN_Init 2 */
 
-  // Configure Filter
-
-  CAN_FilterTypeDef  fc;
-
-  fc.FilterBank           = 0;
-  fc.FilterMode           = CAN_FILTERMODE_IDMASK;
-  fc.FilterScale          = CAN_FILTERSCALE_32BIT;
-  fc.FilterIdHigh         = 0x0000;
-  fc.FilterIdLow          = 0x0000;
-  fc.FilterMaskIdHigh     = 0x0000;
-  fc.FilterMaskIdLow      = 0x0000;
-  fc.FilterFIFOAssignment = CAN_RX_FIFO0;
-  fc.FilterActivation     = ENABLE;
-  fc.SlaveStartFilterBank = 14;
-
-
-  if (HAL_CAN_ConfigFilter(&hcan, &fc) != HAL_OK)
-  {
-    /* Filter configuration Error */
-    Error_Handler();
-  }
-
-  if (HAL_CAN_Start(&hcan) != HAL_OK)
-  {
-    /* Start Error */
-    Error_Handler();
-  }
-
-
-  if (HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
-  {
-    /* Notification Error */
-    Error_Handler();
-  }
-
-  // Configure Transmission
-
-  CanTxHeader.StdId = 0x14;
-  CanTxHeader.RTR   = CAN_RTR_DATA;
-  CanTxHeader.IDE   = CAN_ID_STD;
-  CanTxHeader.TransmitGlobalTime = DISABLE;
-
   /* USER CODE END CAN_Init 2 */
+
+}
+
+/**
+  * @brief IWDG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_IWDG_Init(void)
+{
+
+  /* USER CODE BEGIN IWDG_Init 0 */
+#ifdef DEBUG
+  return;
+#endif
+  /* USER CODE END IWDG_Init 0 */
+
+  /* USER CODE BEGIN IWDG_Init 1 */
+
+  /* USER CODE END IWDG_Init 1 */
+  hiwdg.Instance = IWDG;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_32;
+  hiwdg.Init.Window = 4095;
+  hiwdg.Init.Reload = 4095;
+  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN IWDG_Init 2 */
+
+  /* USER CODE END IWDG_Init 2 */
 
 }
 
@@ -282,94 +261,19 @@ static void MX_CAN_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
+/* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : LED_Pin */
-  GPIO_InitStruct.Pin = LED_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
-
+/* USER CODE BEGIN MX_GPIO_Init_2 */
+/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
 
-void CAN_Send(uint8_t *data, int length) {
-	//while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) == 0);
-	CanTxHeader.DLC = length;
-	if (HAL_CAN_AddTxMessage(&hcan, &CanTxHeader, data, &CanTxMailbox) != HAL_OK) {
-		/* Transmission request Error */
-		Error_Handler();
-	}
-//	int i = 0;
-//	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) != 3) {
-//		i++;
-//		if (i > 10000) break;
-//	}
-}
-
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
-{
-  /* Get RX message */
-  if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &CanRxHeader, CanRxData) != HAL_OK)
-  {
-    /* Reception Error */
-    Error_Handler();
-  }
-
-#ifdef DBG
-  //printf("r %d\n", CanRxHeader.DLC);
-#endif
-
-  if (CanRxHeader.DLC != 8) return;
-
-  Command* command = readCAN(&can_channel, CanRxData);
-
-  if (command) {
-#ifdef DBG
-	  printCommand(command);
-#endif
-
-	  uint8_t tx[11];
-	  while (true) {
-		  int len;
-		  int remains = writeHex(&usb_channel, command, tx, &len);
-		  uint8_t result = CDC_Transmit_FS(tx, len);
-
-		  if (result == USBD_BUSY) {
-			  HAL_Delay(1);
-			  result = CDC_Transmit_FS(tx, len);
-		  }
-
-		  if (remains == 0) break;
-	  }
-  }
-
-  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, RESET);
-
-
-//
-//  Message message;
-//  bool success = decodeMessage(&message, CanRxData);
-//  if (!success) return;
-//
-//  uint8_t tx[20];
-//  uint8_t count = encodeHexMessage(&message, tx);
-
-
-  //CDC_Transmit_FS(tx, count);
-//  printf(CanRxData);
-
-}
 /* USER CODE END 4 */
 
 /**
