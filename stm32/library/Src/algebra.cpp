@@ -99,23 +99,23 @@ Quaternion Quaternion::fromEuler(float x, float y, float z) {
     float s2 = sin(z/2);
     float s3 = sin(x/2);
     Quaternion ret;
-    ret.a = c1 * c2 * c3 + s1 * s2 * s3;
-    ret.b = c1 * c2 * s3 - s1 * s2 * c3;
-    ret.c = s1 * c2 * c3 + c1 * s2 * s3;
-    ret.d = c1 * s2 * c3 - s1 * c2 * s3;
+    ret.w = c1 * c2 * c3 + s1 * s2 * s3;
+    ret.x = c1 * c2 * s3 - s1 * s2 * c3;
+    ret.y = s1 * c2 * c3 + c1 * s2 * s3;
+    ret.z = c1 * s2 * c3 - s1 * c2 * s3;
     return ret;
 }
 
 float Quaternion::operator[](unsigned i) const {
     switch (i) {
     case 0:
-        return a;
+        return x;
     case 1:
-        return b;
+        return y;
     case 2:
-        return c;
+        return z;
     case 3:
-        return d;
+        return w;
     default:
         return 0;
     }
@@ -123,43 +123,54 @@ float Quaternion::operator[](unsigned i) const {
 float & Quaternion::operator[](unsigned i) {
     switch (i) {
     case 0:
-        return a;
+        return x;
     case 1:
-        return b;
+        return y;
     case 2:
-        return c;
+        return z;
     case 3:
-        return d;
+        return w;
     default:
-        return a;
+        return w;
     }
 }
 
 Quaternion & Quaternion::operator*=(const Quaternion &q) {
     Quaternion ret;
-    ret.a = a*q.a - b*q.b - c*q.c - d*q.d;
-    ret.b = b*q.a + a*q.b + c*q.d - d*q.c;
-    ret.c = a*q.c - b*q.d + c*q.a + d*q.b;
-    ret.d = a*q.d + b*q.c - c*q.b + d*q.a;
+    ret.w = w*q.w - x*q.x - y*q.y - z*q.z;
+    ret.x = x*q.w + w*q.x + y*q.z - z*q.y;
+    ret.y = w*q.y - x*q.z + y*q.w + z*q.x;
+    ret.z = w*q.z + x*q.y - y*q.x + z*q.w;
     return (*this = ret);
 }
 
 Quaternion Quaternion::inverse() const {
-    float norm2 = a * a + b * b + c * c + d * d;
-    return Quaternion(a / norm2, -b / norm2, -c / norm2, -d / norm2);
+    float norm2 = x * x + y * y + z * z + w * w;
+    return Quaternion(-x / norm2, -y / norm2, -z / norm2, w / norm2);
 }
 
 Vec3 Quaternion::rotate(Vec3 &v) const {
     Quaternion q = (*this) * Quaternion(v) * inverse();
-    return Vec3(q.b, q.c, q.d);
+    return Vec3(q.x, q.y, q.z);
+}
+
+
+float Quaternion::roll() const {
+  return atan2f(w*x + y*z, 0.5f - x*x - y*y);
+}
+float Quaternion::pitch() const {
+  return asinf(-2.0f * (x*z - w*y));
+}
+float Quaternion::yaw() const {
+  return atan2f(x*y + w*z, 0.5f - y*y - z*z);
 }
 
 void Quaternion::show(char* buf) const {
-	int a_ = (int)(a * 1000) % 1000;
-	int b_ = (int)(b * 1000) % 1000;
-	int c_ = (int)(c * 1000) % 1000;
-	int d_ = (int)(d * 1000) % 1000;
-    sprintf(buf, "[%d.%03d, %d.%03d, %d.%03d, %d.%03d]", (int)a, abs(a_), (int)b, abs(b_), (int)c, abs(c_), (int)d, abs(d_));
+	int x_ = (int)(x * 1000) % 1000;
+	int y_ = (int)(y * 1000) % 1000;
+	int z_ = (int)(z * 1000) % 1000;
+	int w_ = (int)(w * 1000) % 1000;
+    sprintf(buf, "[%d.%03d, %d.%03d, %d.%03d, %d.%03d]", (int)x, abs(x_), (int)y, abs(y_), (int)z, abs(z_), (int)w, abs(w_));
 }
 
 

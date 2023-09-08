@@ -12,21 +12,20 @@
 
 
 #include "uart.hpp"
-#include "command.hpp"
+
 
 class TWELITE: public UART {
 public:
-	TWELITE(UART_HandleTypeDef& huart);
+	TWELITE(UART_HandleTypeDef& huart, uint8_t* buf,
+      unsigned ring_size, unsigned tail_size);
 
 	bool begin(bool reset = true);
 	bool interactiveMode();
 	bool config(uint8_t command, const char parameter[]);
 	bool saveConfig();
 
-	void send(const Command& message);
-	void send();
-
-	bool update(Command& message);
+	bool send(const uint8_t* data, unsigned len);
+  unsigned receive(uint8_t*& data);
 
 	inline void setDestination(uint8_t id) { dest_id_ = id; };
 
@@ -36,13 +35,7 @@ public:
 	inline int getErrorCount() const { return error_count_ + dropped_count_; }
 
 private:
-
-	BinaryChannel channel_;
-
 	uint8_t dest_id_;
-
-	uint8_t rx_buf_[TWE_BUF_SIZE];
-	unsigned rx_count_;
 
 	int lqi_;
 
@@ -50,8 +43,6 @@ private:
 	unsigned received_count_;
 	unsigned dropped_count_;
 	unsigned error_count_;
-
-	bool receive();
 
 	inline void error() { error_count_++; }
 

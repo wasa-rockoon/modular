@@ -51,7 +51,13 @@ static uint8_t SPI_RxByte(void)
   dummy = 0xFF;
   data = 0;
 
-  while ((HAL_SPI_GetState(&hspi2) != HAL_SPI_STATE_READY));
+  unsigned wait_until = HAL_GetTick() + SPI_TIMEOUT;
+  while ((HAL_SPI_GetState(&hspi2) != HAL_SPI_STATE_READY)) {
+    if (HAL_GetTick() > wait_until) {
+//      hspi2.State = HAL_SPI_STATE_READY;
+      return data;
+    }
+  }
   HAL_SPI_TransmitReceive(&hspi2, &dummy, &data, 1, SPI_TIMEOUT);
 
   return data;

@@ -52,14 +52,14 @@ public:
 
 class Quaternion {
 public:
-    float a;
-    float b;
-    float c;
-    float d;
+    float x;
+    float y;
+    float z;
+    float w;
 
-    Quaternion() { a = 1; b = c = d = 0; };
-    Quaternion(float a, float b, float c, float d): a(a), b(b), c(c), d(d) {};
-    Quaternion(const Vec3 &v) { a = 0; b = v.x; c = v.y; d = v.z; };
+    Quaternion() { w = 1; x = y = z = 0; };
+    Quaternion(float x, float y, float z, float w): x(x), y(y), z(z), w(w) {};
+    Quaternion(const Vec3 &v) { w = 0; x = v.x; y = v.y; z = v.z; };
 
     static Quaternion fromEuler(float x, float y, float z);
 
@@ -74,16 +74,20 @@ public:
     float & operator[](unsigned i);
 
     Quaternion & operator=(const Quaternion &rhs) {
-        a = rhs.a;
-        b = rhs.b;
-        c = rhs.c;
-        d = rhs.d;
+        x = rhs.x;
+        y = rhs.y;
+        z = rhs.z;
+        w = rhs.w;
         return *this;
     }
     Quaternion & operator*=(const Quaternion &q);
 
     Quaternion inverse() const;
     Vec3 rotate(Vec3 &v) const;
+
+    float roll() const;
+    float pitch() const;
+    float yaw() const;
 
     void show(char* buf) const;
 };

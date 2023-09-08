@@ -86,6 +86,7 @@ void Error_Handler(void);
 #define TWE_TRX_GPIO_Port GPIOB
 #define TWE_RTX_Pin GPIO_PIN_7
 #define TWE_RTX_GPIO_Port GPIOB
+
 /* USER CODE BEGIN Private defines */
 
 

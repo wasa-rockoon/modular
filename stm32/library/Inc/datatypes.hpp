@@ -21,6 +21,8 @@ struct Launch {
   bool igniter: 1;
   bool condition: 1;
   bool allowed: 1;
+  bool connected: 1;
+  bool supplying: 1;
   Sequence sequence: 3;
 };
 

@@ -19,7 +19,7 @@ public:
   bool update();
 
   inline void blink(unsigned sustain_ms = 50) {
-    if (blink_until_ms_ < HAL_GetTick() + sustain_ms)
+//    if (blink_until_ms_ < HAL_GetTick() + sustain_ms)
       blink_until_ms_ = HAL_GetTick() + sustain_ms;
   }
   void watchCount(unsigned count, unsigned blink_sustain_ms = 50);

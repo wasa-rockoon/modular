@@ -64,7 +64,7 @@ void SDTimer_Handler(void) {
 
 /* External variables --------------------------------------------------------*/
 extern CAN_HandleTypeDef hcan;
-extern TIM_HandleTypeDef htim14;
+extern SPI_HandleTypeDef hspi2;
 extern DMA_HandleTypeDef hdma_usart1_rx;
 extern DMA_HandleTypeDef hdma_usart1_tx;
 extern DMA_HandleTypeDef hdma_usart2_rx;
@@ -95,7 +95,7 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-
+  HAL_NVIC_SystemReset();
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
@@ -137,11 +137,7 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
-  FatFsCnt++;
-  if (FatFsCnt >= 10) {
-	  FatFsCnt = 0;
-	  SDTimer_Handler();
-  }
+
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
@@ -187,17 +183,17 @@ void DMA1_Channel4_5_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles TIM14 global interrupt.
+  * @brief This function handles SPI2 global interrupt.
   */
-void TIM14_IRQHandler(void)
+void SPI2_IRQHandler(void)
 {
-  /* USER CODE BEGIN TIM14_IRQn 0 */
+  /* USER CODE BEGIN SPI2_IRQn 0 */
 
-  /* USER CODE END TIM14_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim14);
-  /* USER CODE BEGIN TIM14_IRQn 1 */
+  /* USER CODE END SPI2_IRQn 0 */
+  HAL_SPI_IRQHandler(&hspi2);
+  /* USER CODE BEGIN SPI2_IRQn 1 */
 
-  /* USER CODE END TIM14_IRQn 1 */
+  /* USER CODE END SPI2_IRQn 1 */
 }
 
 /**

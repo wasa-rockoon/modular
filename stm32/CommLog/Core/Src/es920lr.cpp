@@ -12,22 +12,22 @@
 #include <stdlib.h>
 //#include <cstdio>
 
-ES920LR::ES920LR(UART_HandleTypeDef& huart): UART(huart) {
+ES920LR::ES920LR(UART_HandleTypeDef& huart, uint8_t* buf,
+    unsigned ring_size, unsigned tail_size)
+  : UART(huart, buf, ring_size, tail_size) {
 	in_operation_ = false;
 	is_sending_ = false;
-	response_len_ = -1;
-	receiving_len_ = -1;
 
-	rssi = 0;
+	rssi = -255;
 	tx_ok_count = 0;
 	tx_ng_count = 0;
 	rx_count = 0;
 }
 
 bool ES920LR::begin(bool reset) {
-	HAL_Delay(10);
+  bool ok = UART::begin();
 
-	HAL_UART_Receive_DMA(&huart_, this->rx_buf_, RXBUFSIZE);
+	HAL_Delay(100);
 
 	if (reset) {
 		HAL_GPIO_WritePin(LORA_NRST_GPIO_Port, LORA_NRST_Pin, GPIO_PIN_RESET);
@@ -41,13 +41,13 @@ bool ES920LR::begin(bool reset) {
 		clear();
 
 		uint8_t com_processor[] = "2\x0d\x0a";
-		HAL_UART_Transmit_DMA(&huart_, com_processor, 3);
+		write(com_processor, 3);
 
 		return waitConfigResponse();
 	}
 	else {
 		clear();
-		return true;
+		return ok;
 	}
 
 }
@@ -56,12 +56,10 @@ bool ES920LR::startOperation() {
 	HAL_Delay(10);
 
 	uint8_t com_start[] = "z\x0d\x0a";
-	HAL_UART_Transmit_DMA(&huart_, com_start, 3);
+	write(com_start, 3);
 
 	in_operation_ = waitConfigResponse();
 	is_sending_ = false;
-	response_len_ = -1;
-	receiving_len_ = -1;
 
 	HAL_Delay(100);
 
@@ -79,7 +77,7 @@ bool ES920LR::config(uint8_t command, const char parameter[], uint8_t len) {
 		com[1] = '\x0d';
 		com[2] = '\x0a';
 
-		HAL_UART_Transmit_DMA(&huart_, com, 3);
+		write(com, 3);
 	}
 	else {
 		uint8_t com[8];
@@ -89,20 +87,17 @@ bool ES920LR::config(uint8_t command, const char parameter[], uint8_t len) {
 		com[2 + len] = '\x0d';
 		com[3 + len] = '\x0a';
 
-		HAL_UART_Transmit_DMA(&huart_, com, 4 + len);
+		write(com, 4 + len);
 	}
 
 	return waitConfigResponse();
 }
 
 bool ES920LR::waitConfigResponse() {
-	uint8_t response[5];
-	for (int n = 0; n < 4; n++) {
-//		while (rxIsEmpty());
-		response[n] = read();
-	}
-	response[4] = '\0';
-	if (strcmp((const char*)response, "OK\x0d\x0a") == 0) {
+  while (available() < 4);
+
+	uint8_t *response = read(4);
+	if (strncmp((const char*)response, "OK\x0d\x0a", 4) == 0) {
 		return true;
 	}
 	else {
@@ -112,67 +107,21 @@ bool ES920LR::waitConfigResponse() {
 	}
 }
 
-bool ES920LR::send(const char panid[4], const char destid[4], const Command& command) {
 
-	uint8_t* buf = tx_buf();
-	buf[0] = command.id;
-	buf[1] = command.size;
-	uint8_t i = 2;
-	for (int n = 0; n < command.size; n++) {
-		uint8_t len = command.entries[n].encode(buf + i);
-		i += len;
-	}
-
-	uint8_t len = i;
-
-	if (is_sending_ || isReceiving()) return false;
+bool ES920LR::send(const char panid[], const char destid[], const uint8_t* buf, uint8_t len) {
+	if (is_sending_) return false;
 
 	clear();
 
-	tx_buf_[0] = len + 8;
-	strncpy((char*)tx_buf_+ 1, panid, 4);
-	strncpy((char*)tx_buf_+ 5, destid, 4);
+	uint8_t header[128];
+	header[0] = len + 8;
+	strncpy((char*)header+ 1, panid, 4);
+	strncpy((char*)header+ 5, destid, 4);
+	memcpy(header + 9, buf, len);
 
-	HAL_UART_Transmit_DMA(&huart_, tx_buf_, 9 + len);
-	is_sending_ = true;
+	write(header, 9 + len);
+//	write(buf, len);
 
-	return true;
-}
-
-bool ES920LR::receive(Command& command) {
-	int8_t len = receive();
-	if (len < 2) return false;
-
-	command.id   = read();
-	command.size = read();
-	command.to   = 0;
-	command.from = 0;
-
-	int i = 2;
-	for (int n = 0; n < command.size; n++) {
-		uint8_t data[5];
-		for (int i = 0; i < 5; i++) {
-			if (available() == 0) return false;
-			data[i] = read();
-		}
-
-		i += command.entries[n].decode(data);
-	}
-
-	return true;
-}
-
-
-bool ES920LR::send(const char panid[], const char destid[], uint8_t len) {
-	if (is_sending_ || isReceiving()) return false;
-
-	clear();
-
-	tx_buf_[0] = len + 8;
-	strncpy((char*)tx_buf_+ 1, panid, 4);
-	strncpy((char*)tx_buf_+ 5, destid, 4);
-
-	HAL_UART_Transmit_DMA(&huart_, tx_buf_, 9 + len);
 	is_sending_ = true;
 
 	return true;
@@ -181,13 +130,12 @@ bool ES920LR::send(const char panid[], const char destid[], uint8_t len) {
 int8_t ES920LR::getResponse() {
 	if (!is_sending_ || rxIsEmpty()) return -1;
 
-	if (response_len_ == -1) response_len_ = read();
+	unsigned len = peek();
 
-	if ((int8_t)available() < response_len_) return -1;
+  if (available() < len + 1) return -1;
 
-	uint8_t len = response_len_;
+  len = read();
 
-	response_len_ = -1;
 	is_sending_ = false;
 
 	uint8_t res[2];
@@ -216,36 +164,28 @@ int8_t ES920LR::getResponse() {
 	return atoi(code);
 }
 
-int8_t ES920LR::receive() {
-	uint16_t panid;
-	uint16_t addr;
-	return receive(panid, addr);
+unsigned ES920LR::receive(uint8_t*& data) {
+  uint16_t panid;
+  uint16_t addr;
+  return receive(data, panid, addr);
 }
 
-int8_t ES920LR::receive(uint16_t& panid, uint16_t& addr) {
-	if (!in_operation_ || is_sending_ || rxIsEmpty()) return -1;
+unsigned ES920LR::receive(uint8_t*& data, uint16_t& panid, uint16_t& addr) {
+	if (!in_operation_ || is_sending_ || rxIsEmpty()) return 0;
 
-	if (receiving_len_ == -1) receiving_len_ = read();
+	volatile uint8_t len = peek();
 
-	if ((int)available() < receiving_len_) return -1;
+	if (available() < len + 13) return 0;
 
-	int8_t len = receiving_len_ - 8;
-
-	if (len < 0) {
-		clear();
-		return -1;
-	}
-
-	receiving_len_ = -1;
-
-	rssi = read4Hex();
+	len = read();
+	rssi  = read4Hex();
 	panid = read4Hex();
-	addr = read4Hex();
+	addr  = read4Hex();
 	rx_count++;
 
-//	for (int n = 0; n < len; n++) rx_buf_[n] = read();
+	data = read(len - 12);
 
-	return len;
+	return len - 12;
 }
 
 int16_t ES920LR::read4Hex() {
